@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
 import type { ModelSettingsScopeMode } from "./desktop-state";
+import { useI18n } from "./i18n";
 import { SettingsGroup, SettingsInfoRow, SettingsRow } from "./settings-utils";
 
 interface SettingsGeneralSectionProps {
@@ -20,6 +21,7 @@ export function SettingsGeneralSection({
   onSetIntegratedTerminalShell,
   onToggleSkillCommands,
 }: SettingsGeneralSectionProps) {
+  const { t } = useI18n();
   const connectedCount = runtime?.providers.filter((p) => p.hasAuth).length ?? 0;
   const [terminalShellDraft, setTerminalShellDraft] = useState(integratedTerminalShell);
 
@@ -35,13 +37,13 @@ export function SettingsGeneralSection({
 
   return (
     <>
-      <SettingsGroup title="General">
+      <SettingsGroup title={t("settings.general.group")}>
         <SettingsInfoRow
-          label="Connected providers"
-          value={connectedCount > 0 ? String(connectedCount) : "None"}
+          label={t("settings.general.connectedProviders")}
+          value={connectedCount > 0 ? String(connectedCount) : t("settings.general.none")}
         />
-        <SettingsInfoRow label="Discovered skills" value={String(runtime?.skills.length ?? 0)} />
-        <SettingsRow title="Model settings scope" description="Choose whether model defaults apply everywhere or per repo.">
+        <SettingsInfoRow label={t("settings.general.discoveredSkills")} value={String(runtime?.skills.length ?? 0)} />
+        <SettingsRow title={t("settings.general.modelScope")} description={t("settings.general.modelScopeDescription")}>
           <div className="settings-pill-row">
             <button
               className={`settings-pill${modelSettingsScopeMode === "app-global" ? " settings-pill--active" : ""}`}
@@ -49,7 +51,7 @@ export function SettingsGeneralSection({
               aria-pressed={modelSettingsScopeMode === "app-global"}
               onClick={() => onSetModelSettingsScopeMode("app-global")}
             >
-              App global
+              {t("settings.general.appGlobal")}
             </button>
             <button
               className={`settings-pill${modelSettingsScopeMode === "per-repo" ? " settings-pill--active" : ""}`}
@@ -57,21 +59,21 @@ export function SettingsGeneralSection({
               aria-pressed={modelSettingsScopeMode === "per-repo"}
               onClick={() => onSetModelSettingsScopeMode("per-repo")}
             >
-              Per repo
+              {t("settings.general.perRepo")}
             </button>
           </div>
         </SettingsRow>
-        <SettingsRow title="Enable skill slash commands" description="Keep skill slash commands available in the composer.">
+        <SettingsRow title={t("settings.general.enableSkillCommands")} description={t("settings.general.enableSkillCommandsDescription")}>
           <input
-            aria-label="Enable skill slash commands"
+            aria-label={t("settings.general.enableSkillCommands")}
             checked={runtime?.settings.enableSkillCommands ?? true}
             type="checkbox"
             onChange={(event) => onToggleSkillCommands(event.target.checked)}
           />
         </SettingsRow>
-        <SettingsRow title="Shell of integrated terminal" description="Leave blank to use your default login shell.">
+        <SettingsRow title={t("settings.general.integratedTerminalShell")} description={t("settings.general.integratedTerminalShellDescription")}>
           <input
-            aria-label="Shell of integrated terminal"
+            aria-label={t("settings.general.integratedTerminalShell")}
             className="settings-text-input"
             placeholder="/bin/zsh"
             spellCheck={false}
@@ -88,13 +90,13 @@ export function SettingsGeneralSection({
         </SettingsRow>
       </SettingsGroup>
 
-      <SettingsGroup title="Shortcuts">
-        <SettingsInfoRow label="New thread" value="Cmd+Shift+O" />
-        <SettingsInfoRow label="Open settings" value="Cmd+," />
-        <SettingsInfoRow label="Toggle terminal" value="Cmd+J" />
-        <SettingsInfoRow label="New terminal tab" value="Cmd+T" />
-        <SettingsInfoRow label="Send message" value="Enter" />
-        <SettingsInfoRow label="New line" value="Shift+Enter" />
+      <SettingsGroup title={t("settings.general.shortcuts")}>
+        <SettingsInfoRow label={t("settings.general.shortcutNewThread")} value="Cmd+Shift+O" />
+        <SettingsInfoRow label={t("settings.general.shortcutOpenSettings")} value="Cmd+," />
+        <SettingsInfoRow label={t("settings.general.shortcutToggleTerminal")} value="Cmd+J" />
+        <SettingsInfoRow label={t("settings.general.shortcutNewTerminalTab")} value="Cmd+T" />
+        <SettingsInfoRow label={t("settings.general.shortcutSendMessage")} value="Enter" />
+        <SettingsInfoRow label={t("settings.general.shortcutNewLine")} value="Shift+Enter" />
       </SettingsGroup>
     </>
   );

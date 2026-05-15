@@ -6,7 +6,8 @@ import { SettingsGeneralSection } from "./settings-general-section";
 import { SettingsModelsSection } from "./settings-models-section";
 import { SettingsNotificationsSection } from "./settings-notifications-section";
 import { SettingsProvidersSection } from "./settings-providers-section";
-import { type SettingsSection, sectionTitle, sectionDescription } from "./settings-utils";
+import { type SettingsSection, sectionDescriptionKey, sectionTitleKey } from "./settings-utils";
+import { useI18n } from "./i18n";
 
 export type { SettingsSection } from "./settings-utils";
 
@@ -20,6 +21,7 @@ interface SettingsViewProps {
   readonly modelSettingsScopeMode: ModelSettingsScopeMode;
   readonly integratedTerminalShell: string;
   readonly themeMode: "system" | "light" | "dark";
+  readonly language: "en" | "zh-CN";
   readonly onSetModelSettingsScopeMode: (mode: ModelSettingsScopeMode) => void;
   readonly onSetDefaultModel: (provider: string, modelId: string) => void;
   readonly onSetThinkingLevel: (thinkingLevel: RuntimeSettingsSnapshot["defaultThinkingLevel"]) => void;
@@ -34,6 +36,7 @@ interface SettingsViewProps {
   readonly onRequestNotificationPermission: () => void;
   readonly onOpenSystemNotificationSettings: () => void;
   readonly onSetThemeMode: (mode: "system" | "light" | "dark") => void;
+  readonly onSetLanguage: (language: "en" | "zh-CN") => void;
 }
 
 export function SettingsView({
@@ -46,6 +49,7 @@ export function SettingsView({
   modelSettingsScopeMode,
   integratedTerminalShell,
   themeMode,
+  language,
   onSetModelSettingsScopeMode,
   onSetDefaultModel,
   onSetThinkingLevel,
@@ -60,14 +64,17 @@ export function SettingsView({
   onRequestNotificationPermission,
   onOpenSystemNotificationSettings,
   onSetThemeMode,
+  onSetLanguage,
 }: SettingsViewProps) {
+  const { t } = useI18n();
+
   if (!workspace && section !== "general" && section !== "notifications" && section !== "appearance") {
     return (
       <section className="canvas canvas--empty">
         <div className="empty-panel">
-          <div className="session-header__eyebrow">Settings</div>
-          <h1>Select a workspace</h1>
-          <p>Provider and skill settings need a selected workspace.</p>
+          <div className="session-header__eyebrow">{t("settings.title")}</div>
+          <h1>{t("settings.selectWorkspaceTitle")}</h1>
+          <p>{t("settings.selectWorkspaceBody")}</p>
         </div>
       </section>
     );
@@ -78,10 +85,10 @@ export function SettingsView({
       <div className="conversation settings-view">
         <header className="view-header">
           <div>
-            <div className="chat-header__eyebrow">Settings</div>
-            <h1 className="view-header__title">{sectionTitle(section)}</h1>
+            <div className="chat-header__eyebrow">{t("settings.title")}</div>
+            <h1 className="view-header__title">{t(sectionTitleKey(section))}</h1>
             <p className="view-header__body">
-              {sectionDescription(section, workspace?.name ?? "this workspace")}
+              {t(sectionDescriptionKey(section), { workspace: workspace?.name ?? t("common.workspace") })}
             </p>
           </div>
         </header>
@@ -90,7 +97,9 @@ export function SettingsView({
           {section === "appearance" ? (
             <SettingsAppearanceSection
               themeMode={themeMode}
+              language={language}
               onSetThemeMode={onSetThemeMode}
+              onSetLanguage={onSetLanguage}
             />
           ) : null}
 

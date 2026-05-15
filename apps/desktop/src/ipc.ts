@@ -107,6 +107,8 @@ export const desktopIpc = {
   getResolvedTheme: "pi-gui:get-resolved-theme",
   setThemeMode: "pi-gui:set-theme-mode",
   themeChanged: "pi-gui:theme-changed",
+  getLanguage: "pi-gui:get-language",
+  setLanguage: "pi-gui:set-language",
   ping: "app:ping",
   openExternal: "app:open-external",
 } as const;
@@ -329,4 +331,6 @@ export interface PiDesktopApi {
   getResolvedTheme(): Promise<"light" | "dark">;
   setThemeMode(mode: "system" | "light" | "dark"): Promise<string>;
   onThemeChanged(callback: (theme: "light" | "dark") => void): () => void;
+  getLanguage(): Promise<"en" | "zh-CN">;
+  setLanguage(language: "en" | "zh-CN"): Promise<"en" | "zh-CN">;
 }

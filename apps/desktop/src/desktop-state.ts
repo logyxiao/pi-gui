@@ -9,6 +9,7 @@ export type WorkspaceKind = "primary" | "worktree";
 export type WorktreeStatus = "ready" | "missing" | "error";
 export type NewThreadEnvironment = "local" | "worktree";
 export type ThemeMode = "system" | "light" | "dark";
+export type LanguageMode = "en" | "zh-CN";
 export type ModelSettingsScopeMode = "app-global" | "per-repo";
 export type ComposerDraftSyncSource =
   | "state"

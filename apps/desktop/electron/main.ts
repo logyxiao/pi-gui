@@ -25,7 +25,7 @@ import {
 import { checkForUpdate, initUpdateChecker } from "./update-checker";
 import { ThemeManager } from "./theme-manager";
 import { TerminalService } from "./terminal-service";
-import type { DesktopAppState, ThemeMode } from "../src/desktop-state";
+import type { DesktopAppState, LanguageMode, ThemeMode } from "../src/desktop-state";
 import { desktopIpc, getDesktopCommandFromShortcut } from "../src/ipc";
 import { SUPPORTED_COMPOSER_IMAGE_TYPES } from "../src/composer-attachments";
 import type {
@@ -52,6 +52,7 @@ let notificationManager: NotificationManager | undefined;
 let notificationPermissionService: NotificationPermissionService | undefined;
 let terminalService: TerminalService | undefined;
 let integratedTerminalShell = "";
+let languageMode: LanguageMode = "en";
 let stopPublishingState: (() => void) | undefined;
 let stopPublishingSelectedTranscript: (() => void) | undefined;
 let stopTrackingWindowActivation: (() => void) | undefined;
@@ -377,6 +378,7 @@ app.setName("pi");
 
 const configuredUserDataDir = process.env.PI_APP_USER_DATA_DIR?.trim() || app.getPath("userData");
 app.setPath("userData", configuredUserDataDir);
+languageMode = resolveInitialLanguageMode();
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
@@ -483,6 +485,11 @@ app.whenReady().then(async () => {
   ipcMain.handle(desktopIpc.setThemeMode, (_event, mode: ThemeMode) => {
     themeManager.setMode(mode);
     return mode;
+  });
+  ipcMain.handle(desktopIpc.getLanguage, () => languageMode);
+  ipcMain.handle(desktopIpc.setLanguage, (_event, language: LanguageMode) => {
+    languageMode = normalizeLanguageMode(language) ?? "en";
+    return languageMode;
   });
   ipcMain.handle(desktopIpc.openExternal, (_event, url: string) => {
     const parsed = new URL(url);
@@ -798,6 +805,28 @@ function resolveInitialWorkspacePaths(): readonly string[] {
   }
 
   return [];
+}
+
+function resolveInitialLanguageMode(): LanguageMode {
+  const envLanguage = normalizeLanguageMode(process.env.PI_APP_LANGUAGE);
+  if (envLanguage) {
+    return envLanguage;
+  }
+  return normalizeLanguageMode(app.getLocale()) ?? "en";
+}
+
+function normalizeLanguageMode(value: string | undefined | null): LanguageMode | undefined {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) {
+    return undefined;
+  }
+  if (normalized === "zh-cn" || normalized === "zh" || normalized.startsWith("zh-")) {
+    return "zh-CN";
+  }
+  if (normalized === "en" || normalized.startsWith("en-")) {
+    return "en";
+  }
+  return undefined;
 }
 
 async function readComposerAttachment(filePath: string): Promise<ComposerAttachment> {

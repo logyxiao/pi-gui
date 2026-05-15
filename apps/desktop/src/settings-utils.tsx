@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { RuntimeSettingsSnapshot, RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
+import type { TranslationKey } from "./i18n";
 
 export type SettingsSection = "appearance" | "general" | "providers" | "models" | "notifications";
 
@@ -36,6 +37,21 @@ export function sectionTitle(section: SettingsSection): string {
   }
 }
 
+export function sectionTitleKey(section: SettingsSection): TranslationKey {
+  switch (section) {
+    case "appearance":
+      return "settings.nav.appearance";
+    case "providers":
+      return "settings.nav.providers";
+    case "models":
+      return "settings.nav.models";
+    case "notifications":
+      return "settings.nav.notifications";
+    default:
+      return "settings.nav.general";
+  }
+}
+
 export function sectionDescription(section: SettingsSection, workspaceName: string): string {
   switch (section) {
     case "appearance":
@@ -48,6 +64,21 @@ export function sectionDescription(section: SettingsSection, workspaceName: stri
       return "Manage both macOS notification access and which background events should alert you.";
     default:
       return "Keep the high-value app and runtime controls close to hand.";
+  }
+}
+
+export function sectionDescriptionKey(section: SettingsSection): TranslationKey {
+  switch (section) {
+    case "appearance":
+      return "settings.description.appearance";
+    case "providers":
+      return "settings.description.providers";
+    case "models":
+      return "settings.description.models";
+    case "notifications":
+      return "settings.description.notifications";
+    default:
+      return "settings.description.general";
   }
 }
 

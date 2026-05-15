@@ -51,6 +51,7 @@ import {
   extractFilesFromDataTransfer,
   readComposerAttachmentsFromFiles,
 } from "./composer-attachments";
+import { useI18n, type LanguageCode } from "./i18n";
 
 function useDesktopAppState() {
   const [snapshot, setSnapshot] = useState<DesktopAppState | null>(null);
@@ -149,7 +150,14 @@ function formatRunningLabel(startedAt: string | undefined): string {
   return remaining === 0 ? `Working for ${minutes}m` : `Working for ${minutes}m ${remaining}s`;
 }
 
-export default function App() {
+export default function App({
+  language,
+  onSetLanguage,
+}: {
+  readonly language: LanguageCode;
+  readonly onSetLanguage: (language: LanguageCode) => void;
+}) {
+  const { t } = useI18n();
   const [snapshot, setSnapshot, selectedTranscript] = useDesktopAppState();
   const [composerDraft, setComposerDraft] = useState("");
   const [settingsSection, setSettingsSection] = useState<SettingsSection>("general");
@@ -1259,9 +1267,9 @@ export default function App() {
     return (
       <div className="shell shell--loading">
         <main className="loading-card">
-          <div className="loading-card__eyebrow">pi-gui</div>
-          <h1>Loading sessions</h1>
-          <p>The desktop shell is restoring folder and thread state from the main process.</p>
+          <div className="loading-card__eyebrow">{t("common.appName")}</div>
+          <h1>{t("common.loadingSessions")}</h1>
+          <p>{t("common.restoreState")}</p>
         </main>
       </div>
     );
@@ -1868,11 +1876,11 @@ export default function App() {
   };
 
   const settingsNav = [
-    { id: "appearance", label: "Appearance" },
-    { id: "general", label: "General" },
-    { id: "providers", label: "Providers" },
-    { id: "models", label: "Models" },
-    { id: "notifications", label: "Notifications" },
+    { id: "appearance", label: t("settings.nav.appearance") },
+    { id: "general", label: t("settings.nav.general") },
+    { id: "providers", label: t("settings.nav.providers") },
+    { id: "models", label: t("settings.nav.models") },
+    { id: "notifications", label: t("settings.nav.notifications") },
   ] as const;
 
   if (snapshot.activeView === "settings") {
@@ -1883,12 +1891,12 @@ export default function App() {
         onBack={() => setActiveView("threads")}
         onSelectNav={(section) => setSettingsSection(section as SettingsSection)}
         testId="settings-surface"
-        title="Settings"
+        title={t("settings.title")}
       >
         {settingsSection === "providers" || (settingsSection === "models" && snapshot.modelSettingsScopeMode === "per-repo") ? (
           <div className="surface-toolbar">
             <label className="surface-toolbar__field">
-              <span>Workspace</span>
+              <span>{t("common.workspace")}</span>
               <select
                 value={settingsWorkspace?.id ?? ""}
                 onChange={(event) => setSettingsWorkspaceId(event.target.value)}
@@ -1912,6 +1920,7 @@ export default function App() {
           modelSettingsScopeMode={snapshot.modelSettingsScopeMode}
           integratedTerminalShell={snapshot.integratedTerminalShell}
           themeMode={themeMode}
+          language={language}
           onLoginProvider={handleLoginProvider}
           onLogoutProvider={handleLogoutProvider}
           onSetProviderApiKey={handleSetProviderApiKey}
@@ -1924,6 +1933,7 @@ export default function App() {
           onOpenSystemNotificationSettings={handleOpenSystemNotificationSettings}
           onSetScopedModelPatterns={handleSetScopedModelPatterns}
           onSetThemeMode={handleSetThemeMode}
+          onSetLanguage={onSetLanguage}
           onSetThinkingLevel={handleSetThinkingLevel}
           onToggleSkillCommands={handleToggleSkillCommands}
         />
@@ -1933,10 +1943,10 @@ export default function App() {
 
   if (snapshot.activeView === "skills") {
     return (
-      <SecondarySurface onBack={() => setActiveView("threads")} testId="skills-surface" title="Skills">
+      <SecondarySurface onBack={() => setActiveView("threads")} testId="skills-surface" title={t("sidebar.skills")}>
         <div className="surface-toolbar">
           <label className="surface-toolbar__field">
-            <span>Workspace</span>
+            <span>{t("common.workspace")}</span>
             <select
               value={skillsWorkspace?.id ?? ""}
               onChange={(event) => setSkillsWorkspaceId(event.target.value)}
@@ -1974,10 +1984,10 @@ export default function App() {
 
   if (snapshot.activeView === "extensions") {
     return (
-      <SecondarySurface onBack={() => setActiveView("threads")} testId="extensions-surface" title="Extensions">
+      <SecondarySurface onBack={() => setActiveView("threads")} testId="extensions-surface" title={t("sidebar.extensions")}>
         <div className="surface-toolbar">
           <label className="surface-toolbar__field">
-            <span>Workspace</span>
+            <span>{t("common.workspace")}</span>
             <select
               value={extensionsWorkspace?.id ?? ""}
               onChange={(event) => setExtensionsWorkspaceId(event.target.value)}
@@ -2117,9 +2127,9 @@ export default function App() {
           ) : (
             <section className="canvas canvas--empty">
               <div className="empty-panel">
-                <div className="session-header__eyebrow">Workspace</div>
-                <h1>Open a folder to start</h1>
-                <p>Add a project folder before creating a new thread.</p>
+                <div className="session-header__eyebrow">{t("empty.workspaceEyebrow")}</div>
+                <h1>{t("empty.openFolderTitle")}</h1>
+                <p>{t("empty.newThreadNoFolderBody")}</p>
               </div>
             </section>
           )
@@ -2131,7 +2141,7 @@ export default function App() {
                   <div className="chat-header__eyebrow">
                     {selectedWorkspace.kind === "worktree"
                       ? `${rootWorkspace?.name ?? selectedWorkspace.name} · ${selectedWorktree?.name ?? selectedWorkspace.branchName ?? "Worktree"}`
-                      : `${selectedWorkspace.name} · Local`}
+                      : `${selectedWorkspace.name} · ${t("common.local")}`}
                   </div>
                   <div className="chat-header__row">
                     <h1 className="chat-header__title">{displayedSessionTitle}</h1>
@@ -2229,16 +2239,16 @@ export default function App() {
         ) : selectedWorkspace ? (
           <section className="canvas canvas--empty">
             <div className="empty-panel">
-              <div className="session-header__eyebrow">Workspace</div>
+              <div className="session-header__eyebrow">{t("empty.workspaceEyebrow")}</div>
               <h1>{selectedWorkspace.name}</h1>
-              <p>Create a thread for this folder, then jump between sessions from the sidebar.</p>
+              <p>{t("empty.workspaceBody")}</p>
               <div className="empty-panel__actions">
                 <button
                   className="button button--primary"
                   type="button"
                   onClick={() => openNewThreadSurface(selectedWorkspace?.rootWorkspaceId ?? selectedWorkspace?.id)}
                 >
-                  New thread
+                  {t("sidebar.newThread")}
                 </button>
               </div>
             </div>
@@ -2246,9 +2256,9 @@ export default function App() {
         ) : (
           <section className="canvas canvas--empty">
             <div className="empty-panel">
-              <div className="session-header__eyebrow">Workspace</div>
-              <h1>Open a folder to start</h1>
-              <p>Add project folders, group sessions under them, and jump between threads from the sidebar.</p>
+              <div className="session-header__eyebrow">{t("empty.workspaceEyebrow")}</div>
+              <h1>{t("empty.openFolderTitle")}</h1>
+              <p>{t("empty.noWorkspaceBody")}</p>
             </div>
           </section>
         )}

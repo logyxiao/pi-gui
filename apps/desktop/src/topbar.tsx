@@ -3,6 +3,7 @@ import type { AppView, DesktopAppState, SessionRecord, WorkspaceRecord, Worktree
 import { DiffIcon, FolderIcon, TerminalIcon } from "./icons";
 import { getDesktopShortcutLabel, type PiDesktopApi } from "./ipc";
 import type { WorkspaceMenuState } from "./hooks/use-workspace-menu";
+import { useI18n } from "./i18n";
 
 interface TopbarProps {
   readonly activeView: AppView;
@@ -48,6 +49,7 @@ export function Topbar(props: TopbarProps) {
     showDiffPanel,
     onToggleDiffPanel,
   } = props;
+  const { t } = useI18n();
   const terminalShortcut = getDesktopShortcutLabel(api.platform, "J");
   const diffShortcut = getDesktopShortcutLabel(api.platform, "D");
 
@@ -68,7 +70,7 @@ export function Topbar(props: TopbarProps) {
     <header className="topbar" data-testid="topbar" onDoubleClick={handleDoubleClick}>
       <div className="topbar__title">
         <span className="topbar__workspace">
-          {rootWorkspace ? rootWorkspace.name : "Open a folder to begin"}
+          {rootWorkspace ? rootWorkspace.name : t("topbar.openFolderToBegin")}
         </span>
         {selectedWorkspace && activeView === "threads" ? (
           <>
@@ -81,7 +83,7 @@ export function Topbar(props: TopbarProps) {
                 type="button"
                 onClick={() => wsMenu.setEnvironmentMenuOpen((current) => !current)}
               >
-                {selectedWorkspace.kind === "worktree" ? selectedWorktree?.name ?? selectedWorkspace.name : "Local"}
+                {selectedWorkspace.kind === "worktree" ? selectedWorktree?.name ?? selectedWorkspace.name : t("common.local")}
               </button>
               {wsMenu.environmentMenuOpen && rootWorkspace ? (
                 <div className="workspace-menu environment-picker__menu">
@@ -90,7 +92,7 @@ export function Topbar(props: TopbarProps) {
                     type="button"
                     onClick={() => wsMenu.selectWorkspace(rootWorkspace.id)}
                   >
-                    Local
+                    {t("common.local")}
                   </button>
                   {activeWorktrees.map((worktree) => {
                     const linkedWorkspace = workspaces.find(
@@ -127,7 +129,7 @@ export function Topbar(props: TopbarProps) {
         ) : activeView === "new-thread" && rootWorkspace ? (
           <>
             <span className="topbar__separator">/</span>
-            <span className="topbar__session">New thread</span>
+            <span className="topbar__session">{t("sidebar.newThread")}</span>
           </>
         ) : null}
       </div>
@@ -135,7 +137,7 @@ export function Topbar(props: TopbarProps) {
       <div className="topbar__actions">
         <div className="shortcut-tooltip-wrap topbar__tooltip-wrap">
           <button
-            aria-label="Toggle terminal"
+            aria-label={t("topbar.toggleTerminal")}
             className={`icon-button topbar__icon ${terminalVisible ? "icon-button--active" : ""}`}
             type="button"
             disabled={!terminalAvailable}
@@ -144,13 +146,13 @@ export function Topbar(props: TopbarProps) {
             <TerminalIcon />
           </button>
           <span className="shortcut-tooltip topbar__tooltip" role="tooltip">
-            <span>Toggle terminal</span>
+            <span>{t("topbar.toggleTerminal")}</span>
             <kbd>{terminalShortcut}</kbd>
           </span>
         </div>
         <div className="shortcut-tooltip-wrap topbar__tooltip-wrap">
           <button
-            aria-label="Toggle changes"
+            aria-label={t("topbar.toggleChanges")}
             className={`icon-button topbar__icon ${showDiffPanel ? "icon-button--active" : ""}`}
             type="button"
             onClick={onToggleDiffPanel}
@@ -158,12 +160,12 @@ export function Topbar(props: TopbarProps) {
             <DiffIcon />
           </button>
           <span className="shortcut-tooltip topbar__tooltip" role="tooltip">
-            <span>Toggle changes</span>
+            <span>{t("topbar.toggleChanges")}</span>
             <kbd>{diffShortcut}</kbd>
           </span>
         </div>
         <button
-          aria-label="Add folder"
+          aria-label={t("topbar.addFolder")}
           className="icon-button topbar__icon"
           type="button"
           onClick={() => {

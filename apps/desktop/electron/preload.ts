@@ -267,4 +267,7 @@ contextBridge.exposeInMainWorld("piApp", {
       ipcRenderer.removeListener(desktopIpc.themeChanged, handler);
     };
   },
+  getLanguage: () => ipcRenderer.invoke(desktopIpc.getLanguage) as Promise<"en" | "zh-CN">,
+  setLanguage: (language: "en" | "zh-CN") =>
+    ipcRenderer.invoke(desktopIpc.setLanguage, language) as Promise<"en" | "zh-CN">,
 });
