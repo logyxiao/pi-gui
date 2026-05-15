@@ -369,7 +369,7 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
           {providerIds.length > 0 && filteredProviderIds.length === 0 ? <div className="settings-hint">{t("settings.models.noProviders")}</div> : null}
         </aside>
         {selectedProvider && selectedProviderId ? (
-          <>
+          <div className="model-manager__workspace">
             <section className="model-manager__config" aria-label={t("settings.models.providerId")}>
               <div className="model-manager__panel-head">
                 <div>
@@ -429,7 +429,7 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
                 {selectedModels.length > 0 && filteredSelectedModels.length === 0 ? <span className="settings-hint">{t("settings.models.noModels")}</span> : null}
               </div>
             </section>
-          </>
+          </div>
         ) : <div className="model-manager__empty settings-hint">{t("settings.models.selectProvider")}</div>}
       </div>
     </SettingsGroup>

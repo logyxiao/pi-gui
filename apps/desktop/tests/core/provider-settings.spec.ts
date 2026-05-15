@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { writeFile } from "node:fs/promises";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 import {
   desktopShortcut,
   launchDesktop,
@@ -168,6 +168,78 @@ test("settings keeps models.json provider overrides in the external-config state
   }
 });
 
+test("advanced model management layout avoids horizontal overflow", async () => {
+  test.setTimeout(60_000);
+  const userDataDir = await makeUserDataDir();
+  const agentDir = join(userDataDir, "agent");
+  const workspacePath = await makeWorkspace("provider-settings-model-manager-layout");
+  await seedAgentDir(agentDir, {
+    withOpenAiAuth: false,
+    withDefaultModel: false,
+    enabledModels: ["openai/gpt-5"],
+  });
+  await writeFile(
+    join(agentDir, "models.json"),
+    `${JSON.stringify(
+      {
+        providers: {
+          "ccswitch-claude-http-very-long-provider-id": {
+            apiKey: "test-key",
+            api: "openai-responses",
+            baseUrl: "https://nexus.example.test/api/very/long/path",
+            models: [
+              { id: "gpt-5.4", enabled: true },
+              { id: "claude-haiku-4-5-20251001", enabled: false },
+              { id: "claude-opus-4-6", enabled: true },
+              { id: "claude-sonnet-4-6", enabled: true },
+            ],
+          },
+          "ccswitch-codex-nexus-channel": {
+            apiKey: "test-key",
+            api: "openai-responses",
+            baseUrl: "https://nexus.example.test",
+            models: [
+              { id: "codex-auto-review", enabled: true },
+              { id: "gpt-5.4-mini", enabled: true },
+            ],
+          },
+        },
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
+
+  const harness = await launchDesktop(userDataDir, {
+    agentDir,
+    envOverrides: { PI_AGENT_DIR: agentDir },
+    initialWorkspaces: [workspacePath],
+    scrubProviderEnv: true,
+    testMode: "background",
+  });
+
+  try {
+    const window = await harness.firstWindow();
+    await window.keyboard.press(desktopShortcut(","));
+    await expect(window.getByTestId("settings-surface")).toBeVisible();
+    await window.locator(".secondary-surface__nav-item").nth(3).click();
+    await expect(window.locator(".model-manager")).toBeVisible();
+    await expect(window.locator(".model-manager__workspace")).toBeVisible();
+    await expect(window.locator(".model-manager__provider")).toHaveCount(2);
+
+    await window.setViewportSize({ width: 900, height: 720 });
+    await expect.poll(() => hasHorizontalOverflow(window.locator(".settings-view"))).toBe(false);
+    await expect.poll(() => hasHorizontalOverflow(window.locator(".model-manager"))).toBe(false);
+
+    await window.setViewportSize({ width: 760, height: 720 });
+    await expect.poll(() => hasHorizontalOverflow(window.locator(".settings-view"))).toBe(false);
+    await expect.poll(() => hasHorizontalOverflow(window.locator(".model-manager"))).toBe(false);
+  } finally {
+    await harness.close();
+  }
+});
+
 test("opening the first workspace from the empty state hydrates provider and model settings without refresh", async () => {
   test.setTimeout(60_000);
   const userDataDir = await makeUserDataDir();
@@ -221,3 +293,7 @@ test("opening the first workspace from the empty state hydrates provider and mod
     await harness.close();
   }
 });
+
+async function hasHorizontalOverflow(locator: Locator): Promise<boolean> {
+  return locator.evaluate((element) => element.scrollWidth > element.clientWidth + 1);
+}
