@@ -269,6 +269,17 @@ export function StatusIcon() {
   );
 }
 
+export function DashboardIcon() {
+  return (
+    <Icon>
+      <path d="M4 11.4a6 6 0 1 1 12 0" stroke="currentColor" strokeLinecap="round" strokeWidth="1.35" />
+      <path d="M10 10.8 13.25 7.55" stroke="currentColor" strokeLinecap="round" strokeWidth="1.45" />
+      <path d="M5.35 13.8h9.3" stroke="currentColor" strokeLinecap="round" strokeWidth="1.35" />
+      <path d="M5.2 10.8h1.35M13.45 10.8h1.35M7.05 7.25l.95.95" stroke="currentColor" strokeLinecap="round" strokeWidth="1.25" />
+    </Icon>
+  );
+}
+
 export function SkillIcon() {
   return (
     <Icon>

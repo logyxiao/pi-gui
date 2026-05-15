@@ -450,6 +450,8 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
           authType: provider?.authType ?? "none",
           reasoning: Boolean(model.reasoning),
           supportsImages: model.input.includes("image"),
+          ...(typeof model.contextWindow === "number" ? { contextWindow: model.contextWindow } : {}),
+          ...(typeof model.maxTokens === "number" ? { maxTokens: model.maxTokens } : {}),
         };
       })
       .sort((left, right) =>

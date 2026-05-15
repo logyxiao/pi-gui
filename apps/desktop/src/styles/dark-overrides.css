@@ -121,9 +121,64 @@
   border-bottom-color: var(--line);
 }
 
-:root.dark .composer__attach {
+:root.dark .composer__action-button {
   border-color: var(--line);
   background: var(--surface-muted);
+  box-shadow: none;
+}
+
+:root.dark .composer__action-button:hover:not(:disabled),
+:root.dark .composer__action-button:focus-visible {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.28);
+}
+
+:root.dark .composer__send-button,
+:root.dark .composer__send-button:hover:not(:disabled),
+:root.dark .composer__send-button:focus-visible {
+  color: var(--button-primary-ink);
+  border-color: var(--button-primary-border);
+  background: var(--button-primary-bg);
+}
+
+:root.dark .composer__send-button:disabled {
+  color: var(--button-primary-disabled-ink);
+  border-color: var(--button-primary-disabled-border);
+  background: var(--button-primary-disabled-bg);
+}
+
+:root.dark .composer__action-tooltip {
+  border-color: var(--line);
+  background: rgba(43, 45, 49, 0.98);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.42);
+}
+
+:root.dark .composer__meter {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+:root.dark .composer__meter span {
+  background: var(--muted-strong);
+}
+
+:root.dark .composer__balance-value strong {
+  color: oklch(72% 0.13 150);
+}
+
+:root.dark .composer__tooltip-refresh {
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+:root.dark .composer__tooltip-refresh:hover:not(:disabled),
+:root.dark .composer__tooltip-refresh:focus-visible {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+:root.dark .composer__tooltip-error {
+  color: oklch(72% 0.13 28);
 }
 
 :root.dark .composer-attachment {

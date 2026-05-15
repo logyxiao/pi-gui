@@ -2079,6 +2079,7 @@ export default function App({
               composerDraft={composerDraft}
               composerRef={composerRef}
               runtime={selectedModelRuntime}
+              contextUsage={selectedSession.contextUsage}
               provider={resolvedSessionProvider}
               modelId={resolvedSessionModelId}
               thinkingLevel={resolvedSessionThinkingLevel}

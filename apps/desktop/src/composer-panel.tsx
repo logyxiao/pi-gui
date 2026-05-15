@@ -1,7 +1,8 @@
-import { type ClipboardEvent, type Dispatch, type DragEvent, type KeyboardEvent, type RefObject, type SetStateAction } from "react";
+import { useCallback, useEffect, useState, type ClipboardEvent, type Dispatch, type DragEvent, type KeyboardEvent, type RefObject, type SetStateAction } from "react";
+import type { SessionContextUsage } from "@pi-gui/session-driver";
 import type { RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
 import type { ComposerAttachment, QueuedComposerMessage, SessionRecord } from "./desktop-state";
-import { ArrowUpIcon, PlusIcon, StopSquareIcon } from "./icons";
+import { ArrowUpIcon, DashboardIcon, PlusIcon, StopSquareIcon } from "./icons";
 import type {
   ComposerSlashCommand,
   ComposerSlashCommandSection,
@@ -19,6 +20,7 @@ interface ComposerPanelProps {
   readonly selectedSession: SessionRecord;
   readonly lastError?: string;
   readonly runtime?: RuntimeSnapshot;
+  readonly contextUsage?: SessionContextUsage;
   readonly activeSlashCommand?: ComposerSlashCommand;
   readonly activeSlashCommandMeta?: string;
   readonly composerDraft: string;
@@ -68,6 +70,7 @@ export function ComposerPanel({
   selectedSession,
   lastError,
   runtime,
+  contextUsage,
   activeSlashCommand,
   activeSlashCommandMeta,
   composerDraft,
@@ -115,6 +118,89 @@ export function ComposerPanel({
   const { t } = useI18n();
   const hasComposerInput = composerDraft.trim().length > 0 || attachments.length > 0;
   const primaryActionIsStop = selectedSession.status === "running" && !hasComposerInput;
+  const [persistedUsage, setPersistedUsage] = useState<ComposerProviderUsage>({});
+  const [refreshingUsage, setRefreshingUsage] = useState(false);
+  const [usageError, setUsageError] = useState<string | undefined>();
+  const contextStatus = buildComposerContextStatus(
+    runtime,
+    provider,
+    modelId,
+    selectedSession.preview,
+    composerDraft,
+    t("composer.contextUnknown"),
+    contextUsage,
+    persistedUsage.contextWindow,
+    persistedUsage.balance,
+  );
+  const submitShortcut = selectedSession.status === "running"
+    ? t("composer.sendShortcutRunning")
+    : t("composer.sendShortcutIdle");
+
+  const loadPersistedUsage = useCallback(async () => {
+    if (!provider || !window.piApp) {
+      setPersistedUsage({});
+      return;
+    }
+    try {
+      const modelsJson = await window.piApp.readModelsJson();
+      const providerConfig = modelsJson.providers[provider];
+      const modelConfig = providerConfig?.models?.find((entry) => entry.id === modelId);
+      setPersistedUsage({
+        ...(providerConfig?.usageLastValue ? { balance: providerConfig.usageLastValue } : {}),
+        ...(providerConfig?.usageLastCheckedAt ? { checkedAt: providerConfig.usageLastCheckedAt } : {}),
+        ...(typeof modelConfig?.contextWindow === "number" ? { contextWindow: modelConfig.contextWindow } : {}),
+      });
+      setUsageError(undefined);
+    } catch (error) {
+      setUsageError(describeComposerUsageError(error));
+    }
+  }, [modelId, provider]);
+
+  useEffect(() => {
+    void loadPersistedUsage();
+  }, [loadPersistedUsage]);
+
+  const refreshProviderUsage = useCallback(async () => {
+    if (!provider || !window.piApp || refreshingUsage) {
+      return;
+    }
+    setRefreshingUsage(true);
+    setUsageError(undefined);
+    try {
+      const modelsJson = await window.piApp.readModelsJson();
+      const providerConfig = modelsJson.providers[provider];
+      if (!providerConfig?.baseUrl?.trim()) {
+        setUsageError(t("composer.balanceRefreshUnavailable"));
+        return;
+      }
+      const result = await window.piApp.probeProvider({
+        ...providerConfig,
+        headers: providerConfig.headers ?? {},
+        baseUrl: providerConfig.baseUrl,
+      });
+      if (result.status !== "ok" || !result.balance) {
+        setUsageError(result.detail || t("composer.balanceRefreshFailed"));
+        return;
+      }
+      const checkedAt = new Date().toISOString();
+      const nextModelsJson = {
+        providers: {
+          ...modelsJson.providers,
+          [provider]: {
+            ...providerConfig,
+            usageLastValue: result.balance,
+            usageLastCheckedAt: checkedAt,
+          },
+        },
+      };
+      await window.piApp.writeModelsJson(nextModelsJson);
+      setPersistedUsage((current) => ({ ...current, balance: result.balance, checkedAt }));
+    } catch (error) {
+      setUsageError(describeComposerUsageError(error));
+    } finally {
+      setRefreshingUsage(false);
+    }
+  }, [provider, refreshingUsage, t]);
 
   return (
     <footer className="composer">
@@ -164,10 +250,9 @@ export function ComposerPanel({
             <div className="composer__footer">
               <div className="composer__footer-row">
                 <div className="composer__hint">
-                  {selectedSession.status === "running"
-                    ? t("composer.runningHint", { status: runningLabel })
-                    : t("composer.idleHint")}
-                  {" · "}
+                  {selectedSession.status === "running" ? (
+                    <span className="composer__status-text">{t("composer.runningStatus", { status: runningLabel })}</span>
+                  ) : null}
                   <ModelSelector
                     runtime={runtime}
                     provider={provider}
@@ -182,27 +267,74 @@ export function ComposerPanel({
                   />
                 </div>
                 <div className="composer__actions">
+                  <div className="composer__action-tooltip-wrap">
+                    <button
+                      aria-label={t("composer.contextStatus")}
+                      className="icon-button composer__action-button composer__context-button"
+                      type="button"
+                    >
+                      <DashboardIcon />
+                    </button>
+                    <div className="composer__action-tooltip composer__context-tooltip" role="tooltip">
+                      <div className="composer__tooltip-title">{t("composer.contextStatus")}</div>
+                      <div className="composer__meter" aria-hidden="true">
+                        <span style={{ width: `${contextStatus.percent}%` }} />
+                      </div>
+                      <div className="composer__tooltip-row">
+                        <span>{t("composer.contextUsage")}</span>
+                        <strong>{contextStatus.label}</strong>
+                      </div>
+                      <div className="composer__tooltip-row composer__tooltip-row--balance">
+                        <span>{t("composer.providerBalance")}</span>
+                        <span className="composer__balance-value">
+                          <strong>{refreshingUsage ? t("composer.balanceRefreshing") : contextStatus.balance ?? t("composer.balanceUnavailable")}</strong>
+                          <button
+                            aria-label={t("composer.refreshBalance")}
+                            className="icon-button composer__tooltip-refresh"
+                            disabled={refreshingUsage || !provider}
+                            type="button"
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              void refreshProviderUsage();
+                            }}
+                          >
+                            ↻
+                          </button>
+                        </span>
+                      </div>
+                      {persistedUsage.checkedAt ? (
+                        <div className="composer__tooltip-note">{t("composer.balanceLastChecked", { time: formatUsageCheckedAt(persistedUsage.checkedAt) })}</div>
+                      ) : null}
+                      {usageError ? <div className="composer__tooltip-error">{usageError}</div> : null}
+                    </div>
+                  </div>
                   <button
                     aria-label={t("composer.attachFiles")}
-                    className="icon-button composer__attach"
+                    className="icon-button composer__action-button"
                     type="button"
                     onClick={onPickAttachments}
                   >
                     <PlusIcon />
                   </button>
-                  <button
-                    aria-label={primaryActionIsStop ? t("composer.stopRun") : t("composer.sendMessage")}
-                    className="button button--primary button--cta-icon"
-                    data-testid="send"
-                    type="button"
-                    disabled={
-                      !primaryActionIsStop &&
-                      ((!composerDraft.trim() && attachments.length === 0) || modelOnboarding.requiresModelSelection)
-                    }
-                    onClick={onSubmit}
-                  >
-                    {primaryActionIsStop ? <StopSquareIcon /> : <ArrowUpIcon />}
-                  </button>
+                  <div className="composer__action-tooltip-wrap">
+                    <button
+                      aria-label={primaryActionIsStop ? t("composer.stopRun") : t("composer.sendMessage")}
+                      className="icon-button composer__action-button composer__send-button"
+                      data-testid="send"
+                      type="button"
+                      disabled={
+                        !primaryActionIsStop &&
+                        ((!composerDraft.trim() && attachments.length === 0) || modelOnboarding.requiresModelSelection)
+                      }
+                      onClick={onSubmit}
+                    >
+                      {primaryActionIsStop ? <StopSquareIcon /> : <ArrowUpIcon />}
+                    </button>
+                    <div className="composer__action-tooltip" role="tooltip">
+                      {primaryActionIsStop ? t("composer.stopRun") : submitShortcut}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -211,4 +343,92 @@ export function ComposerPanel({
       </div>
     </footer>
   );
+}
+
+interface ComposerContextStatus {
+  readonly percent: number;
+  readonly label: string;
+  readonly balance?: string;
+}
+
+interface ComposerProviderUsage {
+  readonly balance?: string;
+  readonly checkedAt?: string;
+  readonly contextWindow?: number;
+}
+
+function buildComposerContextStatus(
+  runtime: RuntimeSnapshot | undefined,
+  provider: string | undefined,
+  modelId: string | undefined,
+  sessionPreview: string,
+  composerDraft: string,
+  unknownLabel: string,
+  contextUsage: SessionContextUsage | undefined,
+  persistedContextWindow: number | undefined,
+  persistedBalance: string | undefined,
+): ComposerContextStatus {
+  const model = runtime?.models.find((entry) => entry.providerId === provider && entry.modelId === modelId);
+  const contextWindow = contextUsage?.contextWindow ?? readRuntimeModelNumber(model, "contextWindow") ?? readRuntimeModelNumber(model, "maxTokens") ?? persistedContextWindow;
+  const fallbackTokens = estimateTokenCount(`${sessionPreview}\n${composerDraft}`);
+  const tokens = contextUsage?.tokens ?? fallbackTokens;
+  const percent = typeof contextUsage?.percent === "number"
+    ? clamp(Math.round(contextUsage.percent), 0, 100)
+    : contextWindow
+      ? clamp(Math.round((tokens / contextWindow) * 100), 0, 100)
+      : 0;
+  const balance = persistedBalance ?? readRuntimeProviderString(
+    runtime?.providers.find((entry) => entry.id === provider),
+    "usageLastValue",
+  );
+
+  return {
+    percent,
+    label: contextWindow ? `${percent}% · ${formatCompactNumber(tokens)} / ${formatCompactNumber(contextWindow)}` : unknownLabel,
+    ...(balance ? { balance } : {}),
+  };
+}
+
+function estimateTokenCount(text: string): number {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return 0;
+  }
+  return Math.max(1, Math.ceil(trimmed.length / 4));
+}
+
+function readRuntimeModelNumber(model: unknown, key: "contextWindow" | "maxTokens"): number | undefined {
+  if (!model || typeof model !== "object") {
+    return undefined;
+  }
+  const value = (model as Record<string, unknown>)[key];
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
+function readRuntimeProviderString(provider: unknown, key: "usageLastValue"): string | undefined {
+  if (!provider || typeof provider !== "object") {
+    return undefined;
+  }
+  const value = (provider as Record<string, unknown>)[key];
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function formatCompactNumber(value: number): string {
+  return new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 }).format(value);
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function formatUsageCheckedAt(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(date);
+}
+
+function describeComposerUsageError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

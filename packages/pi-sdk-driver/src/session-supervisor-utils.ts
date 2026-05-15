@@ -26,9 +26,13 @@ export interface SnapshotSource {
   readonly config: SessionConfig | undefined;
   readonly runningRunId: string | undefined;
   readonly queuedMessages: readonly SessionQueuedMessage[];
+  readonly session: {
+    getContextUsage?: () => { tokens: number | null; contextWindow: number; percent: number | null } | undefined;
+  } | undefined;
 }
 
 export function buildSnapshot(source: SnapshotSource): SessionSnapshot {
+  const contextUsage = source.session?.getContextUsage?.();
   return {
     ref: { ...source.ref },
     workspace: { ...source.workspace },
@@ -51,6 +55,7 @@ export function buildSnapshot(source: SnapshotSource): SessionSnapshot {
           })),
         }
       : {}),
+    ...(contextUsage ? { contextUsage: { ...contextUsage } } : {}),
   };
 }
 
