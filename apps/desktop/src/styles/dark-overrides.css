@@ -384,9 +384,23 @@
 
 :root.dark .extension-dock__toggle,
 :root.dark .extension-dock--expanded,
-:root.dark .extension-dialog {
+:root.dark .extension-dialog,
+:root.dark .confirm-dialog {
   border-color: var(--line);
   background: var(--surface);
+}
+
+:root.dark .confirm-dialog-backdrop {
+  background: rgba(8, 11, 18, 0.52);
+}
+
+:root.dark .confirm-dialog__mark {
+  background: var(--surface-muted);
+}
+
+:root.dark .confirm-dialog__mark--danger {
+  background: rgba(248, 113, 113, 0.14);
+  color: #fca5a5;
 }
 
 :root.dark .extension-dock__toggle:hover,

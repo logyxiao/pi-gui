@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type Dispatch, type MouseEvent as ReactMouseEvent, type RefObject, type SetStateAction } from "react";
 import type { DesktopAppState, WorkspaceRecord, WorktreeRecord } from "../desktop-state";
 import type { PiDesktopApi } from "../ipc";
+import type { ConfirmDialogProps } from "../confirm-dialog";
 
 interface UseWorkspaceMenuParams {
   readonly api: PiDesktopApi | undefined;
@@ -10,6 +11,8 @@ interface UseWorkspaceMenuParams {
     setSnapshot: Dispatch<SetStateAction<DesktopAppState | null>>,
     action: () => Promise<DesktopAppState>,
   ) => Promise<DesktopAppState>;
+  readonly requestConfirm: (options: Pick<ConfirmDialogProps, "title" | "message" | "confirmLabel" | "tone">) => Promise<boolean>;
+  readonly t: (key: "sidebar.confirmRemoveWorkspaceTitle" | "sidebar.confirmRemoveWorkspaceBody" | "sidebar.confirmRemoveWorktreeTitle" | "sidebar.confirmRemoveWorktreeBody" | "sidebar.remove", params?: Readonly<Record<string, string | number>>) => string;
 }
 
 export interface WorkspaceMenuState {
@@ -41,7 +44,7 @@ export interface WorkspaceMenuState {
 }
 
 export function useWorkspaceMenu(params: UseWorkspaceMenuParams): WorkspaceMenuState {
-  const { api, setSnapshot, updateSnapshot } = params;
+  const { api, requestConfirm, setSnapshot, t, updateSnapshot } = params;
 
   const [workspaceMenuId, setWorkspaceMenuId] = useState<string | null>(null);
   const [workspaceRenameId, setWorkspaceRenameId] = useState<string | null>(null);
@@ -134,13 +137,22 @@ export function useWorkspaceMenu(params: UseWorkspaceMenuParams): WorkspaceMenuS
   };
 
   const removeWorkspace = (workspace: WorkspaceRecord) => {
-    const confirmed = window.confirm(`Remove ${workspace.name} from pi-gui? This will not delete any files.`);
     setWorkspaceMenuId(null);
     setWorkspaceRenameId(null);
-    if (!confirmed || !api) {
+    if (!api) {
       return;
     }
-    void updateSnapshot(api, setSnapshot, () => api.removeWorkspace(workspace.id));
+    void requestConfirm({
+      title: t("sidebar.confirmRemoveWorkspaceTitle"),
+      message: t("sidebar.confirmRemoveWorkspaceBody", { name: workspace.name }),
+      confirmLabel: t("sidebar.remove"),
+      tone: "danger",
+    }).then((confirmed) => {
+      if (!confirmed) {
+        return;
+      }
+      void updateSnapshot(api, setSnapshot, () => api.removeWorkspace(workspace.id));
+    });
   };
 
   const toggleArchived = (workspaceId: string, open: boolean) => {
@@ -170,14 +182,23 @@ export function useWorkspaceMenu(params: UseWorkspaceMenuParams): WorkspaceMenuS
   };
 
   const removeWorktree = (workspaceId: string, worktree: WorktreeRecord) => {
-    const confirmed = window.confirm(`Remove worktree ${worktree.name}? This removes the git worktree from disk.`);
     setEnvironmentMenuOpen(false);
-    if (!confirmed || !api) {
+    if (!api) {
       return;
     }
-    void updateSnapshot(api, setSnapshot, () =>
-      api.removeWorktree({ workspaceId, worktreeId: worktree.id }),
-    );
+    void requestConfirm({
+      title: t("sidebar.confirmRemoveWorktreeTitle"),
+      message: t("sidebar.confirmRemoveWorktreeBody", { name: worktree.name }),
+      confirmLabel: t("sidebar.remove"),
+      tone: "danger",
+    }).then((confirmed) => {
+      if (!confirmed) {
+        return;
+      }
+      void updateSnapshot(api, setSnapshot, () =>
+        api.removeWorktree({ workspaceId, worktreeId: worktree.id }),
+      );
+    });
   };
 
   const selectWorkspace = (workspaceId: string) => {

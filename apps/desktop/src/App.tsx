@@ -45,6 +45,7 @@ import { useThreadSearch } from "./hooks/use-thread-search";
 import { useWorkspaceMenu } from "./hooks/use-workspace-menu";
 import { buildExtensionDockModel, ExtensionDialog, hasExtensionDockContent } from "./extension-session-ui";
 import { TreeModal } from "./tree-modal";
+import { ConfirmDialog, type ConfirmDialogProps } from "./confirm-dialog";
 import { getEffectiveModelRuntime } from "./model-settings";
 import { resolveRepoWorkspaceId } from "./workspace-roots";
 import {
@@ -188,6 +189,11 @@ export default function App({
     loading: false,
     submitting: false,
   });
+  const [confirmDialog, setConfirmDialog] = useState<
+    (Pick<ConfirmDialogProps, "title" | "message" | "confirmLabel" | "cancelLabel" | "tone"> & {
+      readonly resolve: (confirmed: boolean) => void;
+    }) | null
+  >(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const newThreadComposerRef = useRef<HTMLTextAreaElement | null>(null);
   const timelinePaneRef = useRef<HTMLDivElement | null>(null);
@@ -213,6 +219,22 @@ export default function App({
   const [disableTimelineVirtualization, setDisableTimelineVirtualization] = useState(true);
   const threadSearch = useThreadSearch(timelinePaneRef);
   const api = window.piApp;
+  const requestConfirm = useCallback(
+    (options: Pick<ConfirmDialogProps, "title" | "message" | "confirmLabel" | "cancelLabel" | "tone">) =>
+      new Promise<boolean>((resolve) => {
+        setConfirmDialog((current) => {
+          current?.resolve(false);
+          return { ...options, resolve };
+        });
+      }),
+    [],
+  );
+  const closeConfirmDialog = useCallback((confirmed: boolean) => {
+    setConfirmDialog((current) => {
+      current?.resolve(confirmed);
+      return null;
+    });
+  }, []);
   const sidebarToggleStateRef = useRef<{
     readonly api: typeof window.piApp;
     readonly activeView: AppView | undefined;
@@ -828,7 +850,9 @@ export default function App({
 
   const wsMenu = useWorkspaceMenu({
     api,
+    requestConfirm,
     setSnapshot,
+    t,
     updateSnapshot,
   });
 
@@ -2179,6 +2203,17 @@ export default function App({
           />
         ) : null}
       </main>
+      {confirmDialog ? (
+        <ConfirmDialog
+          cancelLabel={confirmDialog.cancelLabel}
+          confirmLabel={confirmDialog.confirmLabel}
+          message={confirmDialog.message}
+          title={confirmDialog.title}
+          tone={confirmDialog.tone}
+          onCancel={() => closeConfirmDialog(false)}
+          onConfirm={() => closeConfirmDialog(true)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -144,11 +144,37 @@ test("stages, generates a commit message, and commits staged changes from the Ch
     await expect(commitInput).toHaveValue("Add generated git panel changes");
 
     await commitInput.fill("Add git panel test changes");
+
+    const history = diffPanel.locator(".diff-panel__history");
+    await expect(history.locator(".diff-panel__history-header")).toHaveAttribute("aria-expanded", "false");
+    await expect(history.locator(".diff-panel__history-list")).toHaveCount(0);
+
     await diffPanel.locator(".diff-panel__commit-btn").click();
 
     await expect(diffPanel.locator(".diff-panel__empty")).toBeVisible();
     await expect(stagedSection.locator(".diff-panel__file")).toHaveCount(0);
-    await expect(diffPanel.locator(".diff-panel__history")).toContainText("Add git panel test changes");
+
+    const syncButton = diffPanel.locator(".diff-panel__sync-btn");
+    await expect(syncButton).toBeVisible();
+    await syncButton.click();
+    await expect(syncButton).toHaveCount(0);
+
+    await history.locator(".diff-panel__history-header").click();
+    await expect(history.locator(".diff-panel__history-header")).toHaveAttribute("aria-expanded", "true");
+    await expect(history.locator(".diff-panel__history-list")).toContainText("Add git panel test changes");
+
+    const historyBoxBefore = await history.boundingBox();
+    expect(historyBoxBefore).not.toBeNull();
+    const resizeHandle = history.locator(".diff-panel__history-resize");
+    const handleBox = await resizeHandle.boundingBox();
+    expect(handleBox).not.toBeNull();
+    await window.mouse.move(handleBox!.x + handleBox!.width / 2, handleBox!.y + handleBox!.height / 2);
+    await window.mouse.down();
+    await window.mouse.move(handleBox!.x + handleBox!.width / 2, handleBox!.y - 60);
+    await window.mouse.up();
+    await expect
+      .poll(async () => (await history.boundingBox())?.height ?? 0)
+      .toBeGreaterThan(historyBoxBefore!.height + 20);
 
     await expect(getGitHeadCommitMessage(workspacePath)).resolves.toBe("Add git panel test changes");
   } finally {

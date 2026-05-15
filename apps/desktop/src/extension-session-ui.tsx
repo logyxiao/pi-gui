@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { HostUiResponse } from "@pi-gui/session-driver";
 import { ChevronDownIcon, ChevronRightIcon } from "./icons";
 import type { SessionExtensionDialogRecord, SessionExtensionUiStateRecord } from "./desktop-state";
+import { ConfirmDialog } from "./confirm-dialog";
 
 const ANSI_ESCAPE_PATTERN = /\u001B\[[0-?]*[ -/]*[@-~]/g;
 const DOCK_SEGMENT_SEPARATOR = "--------------------";
@@ -111,11 +112,21 @@ export function ExtensionDialog({
     ? dialog.options.filter((option) => option.toLowerCase().includes(selectQuery.trim().toLowerCase()))
     : [];
 
+  if (dialog.kind === "confirm") {
+    return (
+      <ConfirmDialog
+        message={dialog.message}
+        title={dialog.title}
+        onCancel={() => onRespond({ requestId: dialog.requestId, cancelled: true })}
+        onConfirm={() => onRespond({ requestId: dialog.requestId, confirmed: true })}
+      />
+    );
+  }
+
   return (
     <div className="extension-dialog-backdrop">
       <div className="extension-dialog" data-testid="extension-dialog">
         <div className="extension-dialog__title">{dialog.title}</div>
-        {dialog.kind === "confirm" ? <p className="extension-dialog__body">{dialog.message}</p> : null}
 
         {dialog.kind === "select" ? (
           <div className="extension-dialog__select">
@@ -172,15 +183,6 @@ export function ExtensionDialog({
           >
             Cancel
           </button>
-          {dialog.kind === "confirm" ? (
-            <button
-              className="button button--primary"
-              type="button"
-              onClick={() => onRespond({ requestId: dialog.requestId, confirmed: true })}
-            >
-              Confirm
-            </button>
-          ) : null}
           {dialog.kind === "input" || dialog.kind === "editor" ? (
             <button
               className="button button--primary"

@@ -8,6 +8,7 @@
 @import "./shared-forms.css";
 @import "./searchable-select.css";
 @import "./toggle-switch.css";
+@import "./confirm-dialog.css";
 @import "./tree-modal.css";
 @import "./responsive-layout.css";
 @import "./thread-search.css";

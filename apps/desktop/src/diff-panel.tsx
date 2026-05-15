@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { PiDesktopApi } from "./ipc";
 import { InlineDiff } from "./diff-inline";
 import { ChevronDownIcon, ChevronRightIcon, MinusIcon, PlusIcon, RefreshIcon, SparkIcon } from "./icons";
@@ -24,7 +24,8 @@ interface CommitHistoryEntry {
 }
 
 type ChangeGroup = "staged" | "unstaged";
-const CHANGE_REFRESH_INTERVAL_MS = 2500;
+const HISTORY_HEIGHT_MIN = 118;
+const HISTORY_HEIGHT_MAX = 520;
 
 export interface DiffPanelFileRequest {
   readonly path: string;
@@ -55,8 +56,13 @@ export function DiffPanel({
   const [loading, setLoading] = useState(false);
   const [commitMessage, setCommitMessage] = useState("");
   const [commitBusy, setCommitBusy] = useState(false);
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [showSyncAfterCleanCommit, setShowSyncAfterCleanCommit] = useState(false);
   const [generatingMessage, setGeneratingMessage] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [historyExpanded, setHistoryExpanded] = useState(false);
+  const [historyHeight, setHistoryHeight] = useState(220);
+  const suppressHistoryToggleRef = useRef(false);
   const [expandedGroups, setExpandedGroups] = useState<ReadonlySet<ChangeGroup>>(
     () => new Set(["staged", "unstaged"]),
   );
@@ -68,15 +74,19 @@ export function DiffPanel({
     setReviewed(loadReviewed(workspaceId, sessionId));
   }, [workspaceId, sessionId]);
 
-  const refresh = useCallback(() => {
+  const refresh = useCallback(async () => {
     setLoading(true);
     setErrorMessage("");
-    void Promise.all([
-      api.getChangedFiles(workspaceId),
-      api.getCommitHistory(workspaceId),
-    ]).then(([result, history]) => {
+    try {
+      const [result, history] = await Promise.all([
+        api.getChangedFiles(workspaceId),
+        api.getCommitHistory(workspaceId),
+      ]);
       setFiles(result);
       setCommitHistory(history);
+      if (result.length > 0) {
+        setShowSyncAfterCleanCommit(false);
+      }
       setRefreshNonce((value) => value + 1);
       setSelectedFile((current) =>
         current && !result.some((f) => f.path === current.path && (current.group === "staged" ? f.staged : f.unstaged)) ? null : current,
@@ -89,10 +99,12 @@ export function DiffPanel({
         return pruned;
       });
       setLoading(false);
-    }).catch((error: unknown) => {
+      return result;
+    } catch (error: unknown) {
       setErrorMessage(error instanceof Error ? error.message : t("changes.errorRefresh"));
       setLoading(false);
-    });
+      return undefined;
+    }
   }, [api, workspaceId, sessionId, t]);
 
   const prevStatusRef = useRef(sessionStatus);
@@ -100,17 +112,12 @@ export function DiffPanel({
     const prev = prevStatusRef.current;
     prevStatusRef.current = sessionStatus;
     if (prev === "running" && sessionStatus !== "running") {
-      refresh();
+      void refresh();
     }
   }, [sessionStatus, refresh]);
 
   useEffect(() => {
-    refresh();
-  }, [workspaceId, sessionId]);
-
-  useEffect(() => {
-    const interval = window.setInterval(refresh, CHANGE_REFRESH_INTERVAL_MS);
-    return () => window.clearInterval(interval);
+    void refresh();
   }, [refresh]);
 
   useEffect(() => {
@@ -137,28 +144,28 @@ export function DiffPanel({
 
   const handleStage = (filePath: string) => {
     setErrorMessage("");
-    void api.stageFile(workspaceId, filePath).then(refresh).catch((error: unknown) => {
+    void api.stageFile(workspaceId, filePath).then(() => void refresh()).catch((error: unknown) => {
       setErrorMessage(error instanceof Error ? error.message : t("changes.errorStageFile"));
     });
   };
 
   const handleUnstage = (filePath: string) => {
     setErrorMessage("");
-    void api.unstageFile(workspaceId, filePath).then(refresh).catch((error: unknown) => {
+    void api.unstageFile(workspaceId, filePath).then(() => void refresh()).catch((error: unknown) => {
       setErrorMessage(error instanceof Error ? error.message : t("changes.errorUnstageFile"));
     });
   };
 
   const handleStageAll = () => {
     setErrorMessage("");
-    void api.stageAllFiles(workspaceId).then(refresh).catch((error: unknown) => {
+    void api.stageAllFiles(workspaceId).then(() => void refresh()).catch((error: unknown) => {
       setErrorMessage(error instanceof Error ? error.message : t("changes.errorStageAll"));
     });
   };
 
   const handleUnstageAll = () => {
     setErrorMessage("");
-    void api.unstageAllFiles(workspaceId).then(refresh).catch((error: unknown) => {
+    void api.unstageAllFiles(workspaceId).then(() => void refresh()).catch((error: unknown) => {
       setErrorMessage(error instanceof Error ? error.message : t("changes.errorUnstageAll"));
     });
   };
@@ -182,15 +189,76 @@ export function DiffPanel({
     if (!message) return;
     setCommitBusy(true);
     setErrorMessage("");
-    void api.commitStagedChanges(workspaceId, message).then(() => {
+    void api.commitStagedChanges(workspaceId, message).then(async () => {
       setCommitMessage("");
       setCommitBusy(false);
-      refresh();
+      const nextFiles = await refresh();
+      setShowSyncAfterCleanCommit(nextFiles?.length === 0);
     }).catch((error: unknown) => {
       setErrorMessage(error instanceof Error ? error.message : t("changes.errorCommit"));
       setCommitBusy(false);
     });
   };
+
+  const handleSync = () => {
+    setSyncBusy(true);
+    setErrorMessage("");
+    void api.syncCurrentWorkspace().then(async () => {
+      setShowSyncAfterCleanCommit(false);
+      await refresh();
+      setSyncBusy(false);
+    }).catch((error: unknown) => {
+      setErrorMessage(error instanceof Error ? error.message : t("changes.errorSync"));
+      setSyncBusy(false);
+    });
+  };
+
+  const handleHistoryResizePointerDown = useCallback((event: ReactPointerEvent<HTMLElement>) => {
+    if (!historyExpanded) return;
+    event.preventDefault();
+    const startY = event.clientY;
+    const startHeight = historyHeight;
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      const nextHeight = startHeight + startY - moveEvent.clientY;
+      setHistoryHeight(Math.min(HISTORY_HEIGHT_MAX, Math.max(HISTORY_HEIGHT_MIN, nextHeight)));
+    };
+    const handlePointerUp = () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp, { once: true });
+  }, [historyExpanded, historyHeight]);
+
+  const handleHistoryHeaderPointerDown = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!historyExpanded) return;
+    const startY = event.clientY;
+    const startHeight = historyHeight;
+    suppressHistoryToggleRef.current = false;
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      const delta = startY - moveEvent.clientY;
+      if (Math.abs(delta) > 3) {
+        suppressHistoryToggleRef.current = true;
+      }
+      if (suppressHistoryToggleRef.current) {
+        setHistoryHeight(Math.min(HISTORY_HEIGHT_MAX, Math.max(HISTORY_HEIGHT_MIN, startHeight + delta)));
+      }
+    };
+    const handlePointerUp = () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp, { once: true });
+  }, [historyExpanded, historyHeight]);
+
+  const handleHistoryToggle = useCallback(() => {
+    if (suppressHistoryToggleRef.current) {
+      suppressHistoryToggleRef.current = false;
+      return;
+    }
+    setHistoryExpanded((value) => !value);
+  }, []);
 
   const toggleGroup = (group: ChangeGroup) => {
     setExpandedGroups((current) => {
@@ -230,7 +298,7 @@ export function DiffPanel({
   const canCommit = hasStagedFiles && commitMessage.trim().length > 0 && !commitBusy;
 
   return (
-    <aside className="diff-panel">
+    <aside className="diff-panel" onMouseEnter={() => void refresh()}>
       <div className="diff-panel__header">
         <h2 className="diff-panel__title">{t("changes.title")}</h2>
         {files.length > 0 ? (
@@ -241,7 +309,7 @@ export function DiffPanel({
         <button
           className="icon-button"
           type="button"
-          onClick={refresh}
+          onClick={() => void refresh()}
           aria-label={t("changes.refresh")}
           disabled={loading}
         >
@@ -252,7 +320,7 @@ export function DiffPanel({
       <div className="diff-panel__commit">
         <div className="diff-panel__commit-input-row">
           <input
-            aria-label="Commit message"
+            aria-label={t("changes.commitMessageInput")}
             className="diff-panel__commit-input"
             placeholder={t("changes.commitPlaceholder")}
             type="text"
@@ -286,50 +354,73 @@ export function DiffPanel({
       </div>
 
       <div className="diff-panel__body">
-        {files.length === 0 ? (
-          <div className="diff-panel__empty">{t("changes.noChanges")}</div>
-        ) : (
-          <>
-            <div className="diff-panel__file-list" ref={fileListRef}>
-              <ChangeSection
-                actionLabel={t("changes.unstageAll")}
-                files={stagedFiles}
-                group="staged"
-                isExpanded={expandedGroups.has("staged")}
-                onActionAll={handleUnstageAll}
-                onFileAction={handleUnstage}
-                onSelectFile={setSelectedFile}
-                onToggle={() => toggleGroup("staged")}
-                reviewed={reviewed}
-                selectedFile={selectedFile}
-                title={t("changes.stagedChanges")}
-                toggleReviewed={toggleReviewed}
-              />
-              <ChangeSection
-                actionLabel={t("changes.stageAll")}
-                files={unstagedFiles}
-                group="unstaged"
-                isExpanded={expandedGroups.has("unstaged")}
-                onActionAll={handleStageAll}
-                onFileAction={handleStage}
-                onSelectFile={setSelectedFile}
-                onToggle={() => toggleGroup("unstaged")}
-                reviewed={reviewed}
-                selectedFile={selectedFile}
-                title={t("changes.unstagedChanges")}
-                toggleReviewed={toggleReviewed}
-              />
+        <div className="diff-panel__changes-area">
+          {files.length === 0 ? (
+            <div className="diff-panel__empty">
+              <span>{t("changes.noChanges")}</span>
+              {showSyncAfterCleanCommit ? (
+                <button
+                  aria-label={t("changes.sync")}
+                  className="diff-panel__sync-btn"
+                  type="button"
+                  onClick={handleSync}
+                  disabled={syncBusy}
+                >
+                  <RefreshIcon />
+                  <span>{syncBusy ? t("changes.syncing") : t("changes.sync")}</span>
+                </button>
+              ) : null}
             </div>
-
-            {selectedFile && diffText ? (
-              <div className="diff-panel__viewer">
-                <div className="diff-panel__viewer-header">{selectedFile.path}</div>
-                <InlineDiff diff={diffText} language={extensionToLanguage(selectedFile.path)} />
+          ) : (
+            <>
+              <div className="diff-panel__file-list" ref={fileListRef}>
+                <ChangeSection
+                  actionLabel={t("changes.unstageAll")}
+                  files={stagedFiles}
+                  group="staged"
+                  isExpanded={expandedGroups.has("staged")}
+                  onActionAll={handleUnstageAll}
+                  onFileAction={handleUnstage}
+                  onSelectFile={setSelectedFile}
+                  onToggle={() => toggleGroup("staged")}
+                  reviewed={reviewed}
+                  selectedFile={selectedFile}
+                  title={t("changes.stagedChanges")}
+                  toggleReviewed={toggleReviewed}
+                />
+                <ChangeSection
+                  actionLabel={t("changes.stageAll")}
+                  files={unstagedFiles}
+                  group="unstaged"
+                  isExpanded={expandedGroups.has("unstaged")}
+                  onActionAll={handleStageAll}
+                  onFileAction={handleStage}
+                  onSelectFile={setSelectedFile}
+                  onToggle={() => toggleGroup("unstaged")}
+                  reviewed={reviewed}
+                  selectedFile={selectedFile}
+                  title={t("changes.unstagedChanges")}
+                  toggleReviewed={toggleReviewed}
+                />
               </div>
-            ) : null}
-          </>
-        )}
-        <CommitHistory history={commitHistory} />
+
+              {selectedFile && diffText ? (
+                <div className="diff-panel__viewer">
+                  <div className="diff-panel__viewer-header">{selectedFile.path}</div>
+                  <InlineDiff diff={diffText} language={extensionToLanguage(selectedFile.path)} />
+                </div>
+              ) : null}
+            </>
+          )}
+        </div>
+        <CommitHistory
+          expanded={historyExpanded}
+          height={historyHeight}
+          history={commitHistory}
+          onHeaderPointerDown={handleHistoryHeaderPointerDown}
+          onResizePointerDown={handleHistoryResizePointerDown}
+          onToggle={handleHistoryToggle}
+        />
       </div>
     </aside>
   );
@@ -366,7 +457,7 @@ function ChangeSection({
 }: ChangeSectionProps) {
   const { t } = useI18n();
   return (
-    <section className="diff-panel__section">
+    <section className={`diff-panel__section${isExpanded ? " diff-panel__section--expanded" : ""}`}>
       <div className="diff-panel__section-header">
         <button
           aria-expanded={isExpanded}
@@ -388,84 +479,123 @@ function ChangeSection({
         </button>
       </div>
       {isExpanded ? (
-        files.length === 0 ? (
-          <div className="diff-panel__section-empty">{t("changes.noFiles")}</div>
-        ) : (
-          files.map((file) => {
-            const isReviewed = reviewed.has(file.path);
-            const isSelected = selectedFile?.path === file.path && selectedFile.group === group;
-            const className = [
-              "diff-panel__file",
-              isSelected ? "diff-panel__file--selected" : "",
-              isReviewed ? "diff-panel__file--reviewed" : "",
-            ]
-              .filter(Boolean)
-              .join(" ");
-            return (
-              <div className={className} key={`${group}:${file.path}`} data-file-path={file.path} data-change-group={group}>
-                <input
-                  aria-label={`Mark ${file.path} reviewed`}
-                  className="diff-panel__reviewed-checkbox"
-                  data-testid={`diff-panel-reviewed-${file.path}`}
-                  type="checkbox"
-                  checked={isReviewed}
-                  onChange={() => toggleReviewed(file.path)}
-                />
-                <button
-                  className="diff-panel__file-name"
-                  type="button"
-                  onClick={() => onSelectFile(isSelected ? null : { path: file.path, group })}
-                >
-                  <span className={`diff-panel__status-dot diff-panel__status-dot--${file.status}`} />
-                  <span>{file.path}</span>
-                </button>
-                <button
-                  aria-label={`${group === "staged" ? t("changes.unstage") : t("changes.stage")} ${file.path}`}
-                  className="diff-panel__stage-btn"
-                  type="button"
-                  onClick={() => onFileAction(file.path)}
-                >
-                  {group === "staged" ? <MinusIcon /> : <PlusIcon />}
-                </button>
-              </div>
-            );
-          })
-        )
+        <div className="diff-panel__section-body">
+          {files.length === 0 ? (
+            <div className="diff-panel__section-empty">{t("changes.noFiles")}</div>
+          ) : (
+            files.map((file) => {
+              const isReviewed = reviewed.has(file.path);
+              const isSelected = selectedFile?.path === file.path && selectedFile.group === group;
+              const className = [
+                "diff-panel__file",
+                isSelected ? "diff-panel__file--selected" : "",
+                isReviewed ? "diff-panel__file--reviewed" : "",
+              ]
+                .filter(Boolean)
+                .join(" ");
+              return (
+                <div className={className} key={`${group}:${file.path}`} data-file-path={file.path} data-change-group={group}>
+                  <input
+                    aria-label={t("changes.markReviewed", { path: file.path })}
+                    className="diff-panel__reviewed-checkbox"
+                    data-testid={`diff-panel-reviewed-${file.path}`}
+                    type="checkbox"
+                    checked={isReviewed}
+                    onChange={() => toggleReviewed(file.path)}
+                  />
+                  <button
+                    className="diff-panel__file-name"
+                    type="button"
+                    onClick={() => onSelectFile(isSelected ? null : { path: file.path, group })}
+                  >
+                    <span className={`diff-panel__status-dot diff-panel__status-dot--${file.status}`} />
+                    <span>{file.path}</span>
+                  </button>
+                  <button
+                    aria-label={`${group === "staged" ? t("changes.unstage") : t("changes.stage")} ${file.path}`}
+                    className="diff-panel__stage-btn"
+                    type="button"
+                    onClick={() => onFileAction(file.path)}
+                  >
+                    {group === "staged" ? <MinusIcon /> : <PlusIcon />}
+                  </button>
+                </div>
+              );
+            })
+          )}
+        </div>
       ) : null}
     </section>
   );
 }
 
-function CommitHistory({ history }: { readonly history: readonly CommitHistoryEntry[] }) {
+function CommitHistory({
+  expanded,
+  height,
+  history,
+  onHeaderPointerDown,
+  onResizePointerDown,
+  onToggle,
+}: {
+  readonly expanded: boolean;
+  readonly height: number;
+  readonly history: readonly CommitHistoryEntry[];
+  readonly onHeaderPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+  readonly onResizePointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
+  readonly onToggle: () => void;
+}) {
   const { t } = useI18n();
   return (
-    <section className="diff-panel__history" aria-label={t("changes.commitHistory")}>
-      <div className="diff-panel__history-header">
-        <span>{t("changes.commitHistory")}</span>
+    <section
+      className={`diff-panel__history${expanded ? " diff-panel__history--expanded" : ""}`}
+      aria-label={t("changes.commitHistory")}
+      style={expanded ? { height } : undefined}
+    >
+      {expanded ? (
+        <button
+          aria-label={t("changes.resizeCommitHistory")}
+          className="diff-panel__history-resize"
+          type="button"
+          onPointerDown={onResizePointerDown}
+        />
+      ) : null}
+      <button
+        aria-expanded={expanded}
+        className="diff-panel__history-header"
+        type="button"
+        onPointerDown={onHeaderPointerDown}
+        onClick={onToggle}
+      >
+        <span className="diff-panel__history-title">
+          {expanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
+          <span>{t("changes.commitHistory")}</span>
+        </span>
         <span className="diff-panel__section-count">{history.length}</span>
-      </div>
-      {history.length === 0 ? (
-        <div className="diff-panel__section-empty">{t("changes.noCommitHistory")}</div>
-      ) : (
-        <div className="diff-panel__history-list">
-          {history.map((commit) => (
-            <div className="diff-panel__history-item" key={commit.hash}>
-              <span className="diff-panel__history-dot" />
-              <div className="diff-panel__history-body">
-                <div className="diff-panel__history-subject">
-                  <span>{commit.subject}</span>
-                  {commit.refs.length > 0 ? <span className="diff-panel__history-ref">{commit.refs[0]}</span> : null}
-                </div>
-                <div className="diff-panel__history-meta">
-                  <span>{commit.hash}</span>
-                  <span>{commit.author}</span>
-                  <span>{commit.relativeTime}</span>
+      </button>
+      {expanded ? (
+        history.length === 0 ? (
+          <div className="diff-panel__section-empty">{t("changes.noCommitHistory")}</div>
+        ) : (
+          <div className="diff-panel__history-list">
+            {history.map((commit) => (
+              <div className="diff-panel__history-item" key={commit.hash}>
+                <span className="diff-panel__history-dot" />
+                <div className="diff-panel__history-body">
+                  <div className="diff-panel__history-subject">
+                    <span>{commit.subject}</span>
+                    {commit.refs.length > 0 ? <span className="diff-panel__history-ref">{commit.refs[0]}</span> : null}
+                  </div>
+                  <div className="diff-panel__history-meta">
+                    <span>{commit.hash}</span>
+                    <span>{commit.author}</span>
+                    <span>{commit.relativeTime}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )
+      ) : null}
     </section>
   );
 }
