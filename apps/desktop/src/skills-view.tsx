@@ -11,6 +11,7 @@ interface SkillsViewProps {
   readonly onOpenSkillFolder: (filePath: string) => void;
   readonly onToggleSkill: (filePath: string, enabled: boolean) => void;
   readonly onTrySkill: (skill: RuntimeSkillRecord) => void;
+  readonly embedded?: boolean;
 }
 
 export function SkillsView({
@@ -20,6 +21,7 @@ export function SkillsView({
   onOpenSkillFolder,
   onToggleSkill,
   onTrySkill,
+  embedded = false,
 }: SkillsViewProps) {
   const [query, setQuery] = useState("");
   const [selectedSkillPath, setSelectedSkillPath] = useState<string | undefined>();
@@ -51,9 +53,9 @@ export function SkillsView({
     );
   }
 
-  return (
-    <section className="canvas">
-      <div className="conversation skills-view">
+  const content = (
+    <div className={`skills-view ${embedded ? "skills-view--embedded" : "conversation"}`}>
+      {!embedded ? (
         <header className="view-header">
           <div>
             <div className="chat-header__eyebrow">Skills</div>
@@ -87,6 +89,32 @@ export function SkillsView({
             </button>
           </div>
         </header>
+      ) : (
+        <div className="settings-embedded-actions">
+          <button className="button button--secondary" type="button" onClick={onRefresh}>
+            <RefreshIcon />
+            <span>Refresh</span>
+          </button>
+          <button
+            className="button button--primary"
+            type="button"
+            onClick={() =>
+              onTrySkill({
+                name: "new-skill",
+                description: "Create a new skill for this workspace",
+                filePath: "",
+                baseDir: workspace.path,
+                source: "project",
+                enabled: true,
+                disableModelInvocation: false,
+                slashCommand: "/skill:new-skill",
+              })
+            }
+          >
+            New skill
+          </button>
+        </div>
+      )}
 
         <div className="skills-toolbar">
           <input
@@ -176,8 +204,13 @@ export function SkillsView({
           </div>
         </div>
       </div>
-    </section>
   );
+
+  if (embedded) {
+    return content;
+  }
+
+  return <section className="canvas">{content}</section>;
 }
 
 function SkillsEmptyState({ message }: { readonly message: string }) {

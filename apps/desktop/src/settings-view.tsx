@@ -6,6 +6,10 @@ import { SettingsGeneralSection } from "./settings-general-section";
 import { SettingsModelsSection } from "./settings-models-section";
 import { SettingsNotificationsSection } from "./settings-notifications-section";
 import { SettingsProvidersSection } from "./settings-providers-section";
+import { SkillsView } from "./skills-view";
+import { ExtensionsView } from "./extensions-view";
+import type { ExtensionCommandCompatibilityRecord } from "./desktop-state";
+import type { RuntimeSkillRecord } from "@pi-gui/session-driver/runtime-types";
 import { type SettingsSection, sectionDescriptionKey, sectionTitleKey } from "./settings-utils";
 import { useI18n } from "./i18n";
 
@@ -37,6 +41,13 @@ interface SettingsViewProps {
   readonly onOpenSystemNotificationSettings: () => void;
   readonly onSetThemeMode: (mode: "system" | "light" | "dark") => void;
   readonly onSetLanguage: (language: "en" | "zh-CN") => void;
+  readonly commandCompatibility?: readonly ExtensionCommandCompatibilityRecord[];
+  readonly onRefreshRuntime: () => void;
+  readonly onOpenSkillFolder: (filePath: string) => void;
+  readonly onToggleSkill: (filePath: string, enabled: boolean) => void;
+  readonly onTrySkill: (skill: RuntimeSkillRecord) => void;
+  readonly onOpenExtensionFolder: (filePath: string) => void;
+  readonly onToggleExtension: (filePath: string, enabled: boolean) => void;
 }
 
 export function SettingsView({
@@ -65,6 +76,13 @@ export function SettingsView({
   onOpenSystemNotificationSettings,
   onSetThemeMode,
   onSetLanguage,
+  commandCompatibility = [],
+  onRefreshRuntime,
+  onOpenSkillFolder,
+  onToggleSkill,
+  onTrySkill,
+  onOpenExtensionFolder,
+  onToggleExtension,
 }: SettingsViewProps) {
   const { t } = useI18n();
 
@@ -130,6 +148,30 @@ export function SettingsView({
               onSetDefaultModel={onSetDefaultModel}
               onSetScopedModelPatterns={onSetScopedModelPatterns}
               onSetThinkingLevel={onSetThinkingLevel}
+            />
+          ) : null}
+
+          {section === "skills" ? (
+            <SkillsView
+              embedded
+              workspace={workspace}
+              runtime={runtime}
+              onOpenSkillFolder={onOpenSkillFolder}
+              onRefresh={onRefreshRuntime}
+              onToggleSkill={onToggleSkill}
+              onTrySkill={onTrySkill}
+            />
+          ) : null}
+
+          {section === "extensions" ? (
+            <ExtensionsView
+              embedded
+              workspace={workspace}
+              runtime={runtime}
+              commandCompatibility={commandCompatibility}
+              onOpenExtensionFolder={onOpenExtensionFolder}
+              onRefresh={onRefreshRuntime}
+              onToggleExtension={onToggleExtension}
             />
           ) : null}
 

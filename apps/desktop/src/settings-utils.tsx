@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { RuntimeSettingsSnapshot, RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
 import type { TranslationKey } from "./i18n";
 
-export type SettingsSection = "appearance" | "general" | "providers" | "models" | "notifications";
+export type SettingsSection = "appearance" | "general" | "providers" | "models" | "skills" | "extensions" | "notifications";
 
 export const THINKING_LEVELS: NonNullable<RuntimeSettingsSnapshot["defaultThinkingLevel"]>[] = [
   "low",
@@ -30,6 +30,10 @@ export function sectionTitle(section: SettingsSection): string {
       return "Providers";
     case "models":
       return "Models";
+    case "skills":
+      return "Skills";
+    case "extensions":
+      return "Extensions";
     case "notifications":
       return "Notifications";
     default:
@@ -45,6 +49,10 @@ export function sectionTitleKey(section: SettingsSection): TranslationKey {
       return "settings.nav.providers";
     case "models":
       return "settings.nav.models";
+    case "skills":
+      return "settings.nav.skills";
+    case "extensions":
+      return "settings.nav.extensions";
     case "notifications":
       return "settings.nav.notifications";
     default:
@@ -60,6 +68,10 @@ export function sectionDescription(section: SettingsSection, workspaceName: stri
       return `Connect providers and manage auth for ${workspaceName}.`;
     case "models":
       return "Choose the default model and which models appear in pickers.";
+    case "skills":
+      return `Discover, enable, and try workspace skills for ${workspaceName}.`;
+    case "extensions":
+      return `Inspect extension commands, tools, and diagnostics for ${workspaceName}.`;
     case "notifications":
       return "Manage both macOS notification access and which background events should alert you.";
     default:
@@ -75,6 +87,10 @@ export function sectionDescriptionKey(section: SettingsSection): TranslationKey 
       return "settings.description.providers";
     case "models":
       return "settings.description.models";
+    case "skills":
+      return "settings.description.skills";
+    case "extensions":
+      return "settings.description.extensions";
     case "notifications":
       return "settings.description.notifications";
     default:

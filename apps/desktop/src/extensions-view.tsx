@@ -10,6 +10,7 @@ interface ExtensionsViewProps {
   readonly onRefresh: () => void;
   readonly onOpenExtensionFolder: (filePath: string) => void;
   readonly onToggleExtension: (filePath: string, enabled: boolean) => void;
+  readonly embedded?: boolean;
 }
 
 export function ExtensionsView({
@@ -19,6 +20,7 @@ export function ExtensionsView({
   onRefresh,
   onOpenExtensionFolder,
   onToggleExtension,
+  embedded = false,
 }: ExtensionsViewProps) {
   const [query, setQuery] = useState("");
   const [selectedExtensionPath, setSelectedExtensionPath] = useState<string | undefined>();
@@ -68,9 +70,9 @@ export function ExtensionsView({
     );
   }
 
-  return (
-    <section className="canvas">
-      <div className="conversation skills-view">
+  const content = (
+    <div className={`skills-view ${embedded ? "skills-view--embedded" : "conversation"}`}>
+      {!embedded ? (
         <header className="view-header">
           <div>
             <div className="chat-header__eyebrow">Extensions</div>
@@ -86,6 +88,14 @@ export function ExtensionsView({
             </button>
           </div>
         </header>
+      ) : (
+        <div className="settings-embedded-actions">
+          <button className="button button--secondary" type="button" onClick={onRefresh}>
+            <RefreshIcon />
+            <span>Refresh</span>
+          </button>
+        </div>
+      )}
 
         <div className="skills-toolbar">
           <input
@@ -182,8 +192,13 @@ export function ExtensionsView({
           </div>
         </div>
       </div>
-    </section>
   );
+
+  if (embedded) {
+    return content;
+  }
+
+  return <section className="canvas">{content}</section>;
 }
 
 function DetailItem({

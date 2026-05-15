@@ -162,8 +162,6 @@ export default function App({
   const [composerDraft, setComposerDraft] = useState("");
   const [settingsSection, setSettingsSection] = useState<SettingsSection>("general");
   const [settingsWorkspaceId, setSettingsWorkspaceId] = useState("");
-  const [skillsWorkspaceId, setSkillsWorkspaceId] = useState("");
-  const [extensionsWorkspaceId, setExtensionsWorkspaceId] = useState("");
   const [pendingNewThreadWorkspaceId, setPendingNewThreadWorkspaceId] = useState("");
   const [newThreadRootWorkspaceId, setNewThreadRootWorkspaceId] = useState("");
   const [newThreadEnvironment, setNewThreadEnvironment] = useState<NewThreadEnvironment>("local");
@@ -333,18 +331,10 @@ export default function App({
   const settingsWorkspace = settingsWorkspaceId
     ? rootWorkspaceOptions.find((workspace) => workspace.id === settingsWorkspaceId)
     : undefined;
-  const skillsWorkspace = skillsWorkspaceId
-    ? rootWorkspaceOptions.find((workspace) => workspace.id === skillsWorkspaceId)
-    : undefined;
-  const extensionsWorkspace = extensionsWorkspaceId
-    ? rootWorkspaceOptions.find((workspace) => workspace.id === extensionsWorkspaceId)
-    : undefined;
   const settingsRuntime = settingsWorkspace ? snapshot?.runtimeByWorkspace[settingsWorkspace.id] : undefined;
   const settingsModelRuntime = snapshot ? getEffectiveModelRuntime(snapshot, settingsWorkspace) : undefined;
-  const skillsRuntime = skillsWorkspace ? snapshot?.runtimeByWorkspace[skillsWorkspace.id] : undefined;
-  const extensionsRuntime = extensionsWorkspace ? snapshot?.runtimeByWorkspace[extensionsWorkspace.id] : undefined;
-  const extensionsCommandCompatibility = extensionsWorkspace
-    ? snapshot?.extensionCommandCompatibilityByWorkspace[extensionsWorkspace.id] ?? []
+  const settingsExtensionCommandCompatibility = settingsWorkspace
+    ? snapshot?.extensionCommandCompatibilityByWorkspace[settingsWorkspace.id] ?? []
     : [];
   const newThreadWorkspace =
     rootWorkspaceOptions.find((entry) => entry.id === newThreadRootWorkspaceId) ?? rootWorkspaceOptions[0];
@@ -898,8 +888,6 @@ export default function App({
   useEffect(() => {
     if (rootWorkspaceOptions.length === 0) {
       setSettingsWorkspaceId("");
-      setSkillsWorkspaceId("");
-      setExtensionsWorkspaceId("");
       setPendingNewThreadWorkspaceId("");
       setNewThreadRootWorkspaceId("");
       setNewThreadEnvironment("local");
@@ -907,12 +895,6 @@ export default function App({
       return;
     }
     setSettingsWorkspaceId((current) =>
-      rootWorkspaceOptions.some((workspace) => workspace.id === current) ? current : (current || rootWorkspaceOptions[0]?.id || ""),
-    );
-    setSkillsWorkspaceId((current) =>
-      rootWorkspaceOptions.some((workspace) => workspace.id === current) ? current : (current || rootWorkspaceOptions[0]?.id || ""),
-    );
-    setExtensionsWorkspaceId((current) =>
       rootWorkspaceOptions.some((workspace) => workspace.id === current) ? current : (current || rootWorkspaceOptions[0]?.id || ""),
     );
     setNewThreadRootWorkspaceId((current) =>
@@ -1327,28 +1309,6 @@ export default function App({
     void updateSnapshot(api, setSnapshot, () => api.setActiveView(view));
   };
 
-  const openSkills = (workspaceId?: string) => {
-    const nextWorkspaceId =
-      workspaceId && rootWorkspaceOptions.some((workspace) => workspace.id === workspaceId)
-        ? workspaceId
-        : skillsWorkspace?.id || rootWorkspaceOptions[0]?.id || "";
-    if (nextWorkspaceId) {
-      setSkillsWorkspaceId(nextWorkspaceId);
-    }
-    setActiveView("skills");
-  };
-
-  const openExtensions = (workspaceId?: string) => {
-    const nextWorkspaceId =
-      workspaceId && rootWorkspaceOptions.some((workspace) => workspace.id === workspaceId)
-        ? workspaceId
-        : extensionsWorkspace?.id || rootWorkspaceOptions[0]?.id || "";
-    if (nextWorkspaceId) {
-      setExtensionsWorkspaceId(nextWorkspaceId);
-    }
-    setActiveView("extensions");
-  };
-
   const openNewThreadSurface = (workspaceId?: string) => {
     setPendingNewThreadWorkspaceId("");
     resetNewThreadSurface(workspaceId);
@@ -1630,31 +1590,31 @@ export default function App({
   };
 
   const handleToggleSkill = (filePath: string, enabled: boolean) => {
-    if (!skillsWorkspace) {
+    if (!settingsWorkspace) {
       return;
     }
-    void updateSnapshot(api, setSnapshot, () => api.setSkillEnabled(skillsWorkspace.id, filePath, enabled));
+    void updateSnapshot(api, setSnapshot, () => api.setSkillEnabled(settingsWorkspace.id, filePath, enabled));
   };
 
   const handleOpenSkillFolder = (filePath: string) => {
-    if (!skillsWorkspace) {
+    if (!settingsWorkspace) {
       return;
     }
-    void api.openSkillInFinder(skillsWorkspace.id, filePath);
+    void api.openSkillInFinder(settingsWorkspace.id, filePath);
   };
 
   const handleToggleExtension = (filePath: string, enabled: boolean) => {
-    if (!extensionsWorkspace) {
+    if (!settingsWorkspace) {
       return;
     }
-    void updateSnapshot(api, setSnapshot, () => api.setExtensionEnabled(extensionsWorkspace.id, filePath, enabled));
+    void updateSnapshot(api, setSnapshot, () => api.setExtensionEnabled(settingsWorkspace.id, filePath, enabled));
   };
 
   const handleOpenExtensionFolder = (filePath: string) => {
-    if (!extensionsWorkspace) {
+    if (!settingsWorkspace) {
       return;
     }
-    void api.openExtensionInFinder(extensionsWorkspace.id, filePath);
+    void api.openExtensionInFinder(settingsWorkspace.id, filePath);
   };
 
   const handleTrySkill = (command: string) => {
@@ -1880,6 +1840,8 @@ export default function App({
     { id: "general", label: t("settings.nav.general") },
     { id: "providers", label: t("settings.nav.providers") },
     { id: "models", label: t("settings.nav.models") },
+    { id: "skills", label: t("settings.nav.skills") },
+    { id: "extensions", label: t("settings.nav.extensions") },
     { id: "notifications", label: t("settings.nav.notifications") },
   ] as const;
 
@@ -1893,7 +1855,7 @@ export default function App({
         testId="settings-surface"
         title={t("settings.title")}
       >
-        {settingsSection === "providers" || (settingsSection === "models" && snapshot.modelSettingsScopeMode === "per-repo") ? (
+        {settingsSection === "providers" || settingsSection === "skills" || settingsSection === "extensions" || (settingsSection === "models" && snapshot.modelSettingsScopeMode === "per-repo") ? (
           <div className="surface-toolbar">
             <label className="surface-toolbar__field">
               <span>{t("common.workspace")}</span>
@@ -1936,39 +1898,14 @@ export default function App({
           onSetLanguage={onSetLanguage}
           onSetThinkingLevel={handleSetThinkingLevel}
           onToggleSkillCommands={handleToggleSkillCommands}
-        />
-      </SecondarySurface>
-    );
-  }
-
-  if (snapshot.activeView === "skills") {
-    return (
-      <SecondarySurface onBack={() => setActiveView("threads")} testId="skills-surface" title={t("sidebar.skills")}>
-        <div className="surface-toolbar">
-          <label className="surface-toolbar__field">
-            <span>{t("common.workspace")}</span>
-            <select
-              value={skillsWorkspace?.id ?? ""}
-              onChange={(event) => setSkillsWorkspaceId(event.target.value)}
-            >
-              {rootWorkspaceOptions.map((workspace) => (
-                <option key={workspace.id} value={workspace.id}>
-                  {workspace.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <SkillsView
-          workspace={skillsWorkspace}
-          runtime={skillsRuntime}
-          onOpenSkillFolder={handleOpenSkillFolder}
-          onRefresh={() => {
-            if (!skillsWorkspace) {
+          commandCompatibility={settingsExtensionCommandCompatibility}
+          onRefreshRuntime={() => {
+            if (!settingsWorkspace) {
               return;
             }
-            void updateSnapshot(api, setSnapshot, () => api.refreshRuntime(skillsWorkspace.id));
+            void updateSnapshot(api, setSnapshot, () => api.refreshRuntime(settingsWorkspace.id));
           }}
+          onOpenSkillFolder={handleOpenSkillFolder}
           onToggleSkill={handleToggleSkill}
           onTrySkill={(skill) =>
             handleTrySkill(
@@ -1977,40 +1914,7 @@ export default function App({
                 : "Create a new skill for this workspace and explain which files you will add.",
             )
           }
-        />
-      </SecondarySurface>
-    );
-  }
-
-  if (snapshot.activeView === "extensions") {
-    return (
-      <SecondarySurface onBack={() => setActiveView("threads")} testId="extensions-surface" title={t("sidebar.extensions")}>
-        <div className="surface-toolbar">
-          <label className="surface-toolbar__field">
-            <span>{t("common.workspace")}</span>
-            <select
-              value={extensionsWorkspace?.id ?? ""}
-              onChange={(event) => setExtensionsWorkspaceId(event.target.value)}
-            >
-              {rootWorkspaceOptions.map((workspace) => (
-                <option key={workspace.id} value={workspace.id}>
-                  {workspace.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <ExtensionsView
-          workspace={extensionsWorkspace}
-          runtime={extensionsRuntime}
-          commandCompatibility={extensionsCommandCompatibility}
           onOpenExtensionFolder={handleOpenExtensionFolder}
-          onRefresh={() => {
-            if (!extensionsWorkspace) {
-              return;
-            }
-            void updateSnapshot(api, setSnapshot, () => api.refreshRuntime(extensionsWorkspace.id));
-          }}
           onToggleExtension={handleToggleExtension}
         />
       </SecondarySurface>
@@ -2021,7 +1925,7 @@ export default function App({
 
   return (
     <div className={shellClassName}>
-      {primarySidebarToggleVisible ? (
+      {primarySidebarToggleVisible && snapshot.sidebarCollapsed ? (
         <SidebarToggleButton
           collapsed={snapshot.sidebarCollapsed}
           shortcutLabel={sidebarToggleShortcutLabel}
@@ -2040,10 +1944,11 @@ export default function App({
           api={api}
           setSnapshot={setSnapshot}
           updateSnapshot={updateSnapshot}
+          sidebarCollapsed={snapshot.sidebarCollapsed}
+          sidebarToggleVisible={primarySidebarToggleVisible}
+          sidebarToggleShortcutLabel={sidebarToggleShortcutLabel}
+          onToggleSidebar={handleTogglePrimarySidebar}
           onNewThread={() => openNewThreadSurface(selectedWorkspace?.rootWorkspaceId ?? selectedWorkspace?.id)}
-          onSetActiveView={setActiveView}
-          onOpenSkills={openSkills}
-          onOpenExtensions={openExtensions}
           onOpenSettings={openSettings}
           onArchiveSession={handleArchiveSession}
           onSelectSession={handleSelectSession}

@@ -31,7 +31,9 @@ Use this skill when the user wants a short demo workflow.
     const window = await harness.firstWindow();
     await createNamedThread(window, "Skill test session");
 
+    await window.getByRole("button", { name: "Settings", exact: true }).click();
     await window.getByRole("button", { name: "Skills", exact: true }).click();
+    await expect(window.getByTestId("settings-surface")).toBeVisible();
     await expect(window.locator(".skills-view")).toBeVisible();
     await expect(window.getByTestId("skills-list")).toContainText("Demo Skill");
     await window.getByRole("button", { name: /Demo Skill/i }).click();
@@ -42,6 +44,7 @@ Use this skill when the user wants a short demo workflow.
     await expect(window.getByTestId("composer")).toHaveValue("/skill:demo-skill ");
 
     await window.getByRole("button", { name: "Settings", exact: true }).click();
+    await window.getByRole("button", { name: "General", exact: true }).click();
     await expect(window.locator(".settings-view")).toBeVisible();
     await expect(window.getByText("Notifications", { exact: true })).toBeVisible();
     await expect(window.locator(".settings-view")).toContainText("Enable skill slash commands");
@@ -55,6 +58,7 @@ Use this skill when the user wants a short demo workflow.
     await expect(window.getByTestId("slash-menu")).toHaveCount(0);
 
     await window.getByRole("button", { name: "Settings", exact: true }).click();
+    await window.getByRole("button", { name: "General", exact: true }).click();
     await expect(skillCommandsToggle).not.toBeChecked();
     await skillCommandsToggle.click();
     await window.getByRole("button", { name: "Back to app", exact: true }).click();

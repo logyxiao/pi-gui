@@ -1,22 +1,22 @@
 :root {
   color-scheme: light;
-  --window: #eceef3;
-  --sidebar: #f4f5f8;
-  --main: #f8f8fb;
-  --surface: #ffffff;
-  --surface-muted: #f1f3f7;
-  --line: #dde1ea;
-  --line-strong: #d2d7e2;
-  --text: #39435b;
-  --text-strong: #1f2638;
-  --muted: #747d93;
-  --muted-strong: #556077;
-  --muted-soft: #8f97aa;
-  --muted-subtle: #a3a9b8;
-  --muted-icon: #8a92a8;
-  --muted-path: #a0a7b8;
-  --muted-settings: #8b92a4;
-  --accent: #6a55f2;
+  --window: oklch(95.5% 0.008 268);
+  --sidebar: oklch(96.6% 0.009 268);
+  --main: oklch(98.2% 0.006 268);
+  --surface: oklch(99.1% 0.004 268);
+  --surface-muted: oklch(95.8% 0.01 268);
+  --line: oklch(89.6% 0.018 268);
+  --line-strong: oklch(84.8% 0.024 268);
+  --text: oklch(34.5% 0.045 268);
+  --text-strong: oklch(22% 0.043 268);
+  --muted: oklch(52% 0.045 268);
+  --muted-strong: oklch(41.5% 0.047 268);
+  --muted-soft: oklch(62% 0.035 268);
+  --muted-subtle: oklch(70% 0.026 268);
+  --muted-icon: oklch(60% 0.034 268);
+  --muted-path: oklch(67% 0.026 268);
+  --muted-settings: oklch(61% 0.032 268);
+  --accent: oklch(55% 0.18 272);
   --error: #c45666;
   --error-ink: #8f3040;
   --font-ui:
@@ -37,12 +37,12 @@
   --ink-strong: var(--text-strong);
   --button-primary-bg: var(--text-strong);
   --button-primary-border: var(--text-strong);
-  --button-primary-ink: #ffffff;
+  --button-primary-ink: oklch(99% 0.004 268);
   --button-primary-hover-bg: #31384d;
   --button-primary-hover-border: #31384d;
   --button-primary-disabled-bg: #b7becc;
   --button-primary-disabled-border: #b7becc;
-  --button-primary-disabled-ink: #ffffff;
+  --button-primary-disabled-ink: oklch(99% 0.004 268);
 }
 
 :root.dark {

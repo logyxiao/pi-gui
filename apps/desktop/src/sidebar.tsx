@@ -14,7 +14,7 @@ import {
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { AppView, SessionRecord, WorkspaceRecord, WorktreeRecord } from "./desktop-state";
-import { ArchiveIcon, ChevronDownIcon, ExtensionIcon, FolderIcon, PlusIcon, RestoreIcon, SettingsIcon, SkillIcon, WorktreeIcon } from "./icons";
+import { ArchiveIcon, ChevronDownIcon, FolderIcon, PlusIcon, RestoreIcon, SettingsIcon, SidebarToggleIcon, WorktreeIcon } from "./icons";
 import type { PiDesktopApi } from "./ipc";
 import { formatRelativeTime } from "./string-utils";
 import type { WorkspaceMenuState } from "./hooks/use-workspace-menu";
@@ -38,10 +38,11 @@ interface SidebarProps {
     setSnapshot: Dispatch<SetStateAction<DesktopAppState | null>>,
     action: () => Promise<DesktopAppState>,
   ) => Promise<DesktopAppState>;
+  readonly sidebarCollapsed: boolean;
+  readonly sidebarToggleVisible: boolean;
+  readonly sidebarToggleShortcutLabel: string;
+  readonly onToggleSidebar: () => void;
   readonly onNewThread: () => void;
-  readonly onSetActiveView: (view: AppView) => void;
-  readonly onOpenSkills: (workspaceId?: string) => void;
-  readonly onOpenExtensions: (workspaceId?: string) => void;
   readonly onOpenSettings: (workspaceId?: string) => void;
   readonly onArchiveSession: (target: { workspaceId: string; sessionId: string }) => void;
   readonly onSelectSession: (target: { workspaceId: string; sessionId: string }) => void;
@@ -60,10 +61,11 @@ export function Sidebar(props: SidebarProps) {
     api,
     setSnapshot,
     updateSnapshot,
+    sidebarCollapsed,
+    sidebarToggleVisible,
+    sidebarToggleShortcutLabel,
+    onToggleSidebar,
     onNewThread,
-    onSetActiveView,
-    onOpenSkills,
-    onOpenExtensions,
     onOpenSettings,
     onArchiveSession,
     onSelectSession,
@@ -122,49 +124,42 @@ export function Sidebar(props: SidebarProps) {
   return (
     <aside className="sidebar">
       <div className="sidebar__top">
-        <button
-          className="sidebar__new"
-          type="button"
-          disabled={!selectedWorkspace}
-          onClick={onNewThread}
-        >
-          <PlusIcon />
-          <span>{t("sidebar.newThread")}</span>
-        </button>
-
-        <div className="sidebar__nav">
+        <div className="sidebar__command-row">
           <button
-            className={`sidebar__nav-item ${activeView === "threads" ? "sidebar__nav-item--active" : ""}`}
+            className="sidebar__new"
             type="button"
-            onClick={() => onSetActiveView("threads")}
+            disabled={!selectedWorkspace}
+            onClick={onNewThread}
           >
-            <FolderIcon />
-            <span>{t("sidebar.threads")}</span>
+            <PlusIcon />
+            <span>{t("sidebar.newThread")}</span>
           </button>
           <button
-            className="sidebar__nav-item"
-            type="button"
-            onClick={() => onOpenSkills(selectedWorkspace?.rootWorkspaceId ?? selectedWorkspace?.id)}
-          >
-            <SkillIcon />
-            <span>{t("sidebar.skills")}</span>
-          </button>
-          <button
-            className="sidebar__nav-item"
-            type="button"
-            onClick={() => onOpenExtensions(selectedWorkspace?.rootWorkspaceId ?? selectedWorkspace?.id)}
-          >
-            <ExtensionIcon />
-            <span>{t("sidebar.extensions")}</span>
-          </button>
-          <button
-            className="sidebar__nav-item"
+            aria-label={t("sidebar.settings")}
+            className={`icon-button sidebar__command-icon ${activeView === "settings" ? "sidebar__command-icon--active" : ""}`}
             type="button"
             onClick={() => onOpenSettings(selectedWorkspace?.rootWorkspaceId ?? selectedWorkspace?.id)}
           >
             <SettingsIcon />
-            <span>{t("sidebar.settings")}</span>
           </button>
+          {sidebarToggleVisible ? (
+            <div className="shortcut-tooltip-wrap sidebar__toggle-wrap">
+              <button
+                aria-label="Toggle sidebar"
+                aria-pressed={!sidebarCollapsed}
+                className="icon-button sidebar__command-icon"
+                data-testid="sidebar-toggle"
+                type="button"
+                onClick={onToggleSidebar}
+              >
+                <SidebarToggleIcon />
+              </button>
+              <span className="shortcut-tooltip sidebar__command-tooltip" role="tooltip">
+                <span>Toggle sidebar</span>
+                <kbd>{sidebarToggleShortcutLabel}</kbd>
+              </span>
+            </div>
+          ) : null}
         </div>
       </div>
 

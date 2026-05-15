@@ -69,16 +69,12 @@ test("toggles and persists the primary sidebar from the button and keyboard shor
     await window.getByRole("button", { name: "Back to app", exact: true }).click();
 
     await restoreSidebarIfNeeded(window);
+    await window.getByRole("button", { name: "Settings", exact: true }).click();
+    await expect(window.getByTestId("settings-surface")).toBeVisible();
     await window.getByRole("button", { name: "Skills", exact: true }).click();
-    await expect(window.getByTestId("skills-surface")).toBeVisible();
-    await expect(window.getByTestId("sidebar-toggle")).toHaveCount(0);
-    await window.keyboard.press(desktopShortcut("B"));
-    await expect.poll(async () => (await getDesktopState(window)).sidebarCollapsed).toBe(false);
-    await window.getByRole("button", { name: "Back to app", exact: true }).click();
-
-    await restoreSidebarIfNeeded(window);
+    await expect(window.locator(".skills-view")).toBeVisible();
     await window.getByRole("button", { name: "Extensions", exact: true }).click();
-    await expect(window.getByTestId("extensions-surface")).toBeVisible();
+    await expect(window.locator(".skills-view")).toBeVisible();
     await expect(window.getByTestId("sidebar-toggle")).toHaveCount(0);
     await window.keyboard.press(desktopShortcut("B"));
     await expect.poll(async () => (await getDesktopState(window)).sidebarCollapsed).toBe(false);
