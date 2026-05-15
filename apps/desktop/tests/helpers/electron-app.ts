@@ -37,6 +37,10 @@ export const TINY_PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7ZfXQAAAAASUVORK5CYII=";
 
 export type PiAppWindow = Window & { piApp?: PiDesktopApi };
+export interface PiAppTestHooks {
+  setCommitMessageOverride?(message: string | null): void;
+  clearCommitMessageOverride?(): void;
+}
 export type DesktopTestMode = "foreground" | "background";
 const desktopModifierKey = process.platform === "darwin" ? "Meta" : "Control";
 
@@ -720,6 +724,11 @@ export async function commitAllInGitRepo(workspacePath: string, message: string)
   await execFileAsync("git", ["commit", "-m", message], { cwd: workspacePath });
 }
 
+export async function getGitHeadCommitMessage(workspacePath: string): Promise<string> {
+  const { stdout } = await execFileAsync("git", ["log", "-1", "--pretty=%s"], { cwd: workspacePath });
+  return stdout.trim();
+}
+
 export async function writeTinyPng(filePath: string): Promise<void> {
   await writeFile(filePath, Buffer.from(TINY_PNG_BASE64, "base64"));
 }
@@ -1125,6 +1134,18 @@ export async function rejectDeferredThreadTitle(harness: DesktopHarness): Promis
     }
     hooks.rejectDeferredThreadTitle();
   });
+}
+
+export async function setCommitMessageOverride(harness: DesktopHarness, message: string | null): Promise<void> {
+  await harness.electronApp.evaluate(async (_, nextMessage) => {
+    const hooks = (globalThis as {
+      __PI_APP_TEST_HOOKS?: { setCommitMessageOverride?: (message: string | null) => void };
+    }).__PI_APP_TEST_HOOKS;
+    if (!hooks?.setCommitMessageOverride) {
+      throw new Error("Commit message override hook is unavailable");
+    }
+    hooks.setCommitMessageOverride(nextMessage);
+  }, message);
 }
 
 export async function seedTranscriptMessages(

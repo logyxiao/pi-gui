@@ -263,11 +263,23 @@ contextBridge.exposeInMainWorld("piApp", {
   listWorkspaceFiles: (workspaceId: string) =>
     ipcRenderer.invoke(desktopIpc.listWorkspaceFiles, workspaceId) as Promise<string[]>,
   getChangedFiles: (workspaceId: string) =>
-    ipcRenderer.invoke(desktopIpc.getChangedFiles, workspaceId) as Promise<{ path: string; status: "added" | "modified" | "deleted" | "untracked"; staged: boolean }[]>,
-  getFileDiff: (workspaceId: string, filePath: string) =>
-    ipcRenderer.invoke(desktopIpc.getFileDiff, workspaceId, filePath) as Promise<string>,
+    ipcRenderer.invoke(desktopIpc.getChangedFiles, workspaceId) as Promise<{ path: string; status: "added" | "modified" | "deleted" | "untracked"; staged: boolean; unstaged: boolean; indexStatus: string; worktreeStatus: string }[]>,
+  getFileDiff: (workspaceId: string, filePath: string, staged?: boolean) =>
+    ipcRenderer.invoke(desktopIpc.getFileDiff, workspaceId, filePath, staged) as Promise<string>,
   stageFile: (workspaceId: string, filePath: string) =>
     ipcRenderer.invoke(desktopIpc.stageFile, workspaceId, filePath) as Promise<void>,
+  unstageFile: (workspaceId: string, filePath: string) =>
+    ipcRenderer.invoke(desktopIpc.unstageFile, workspaceId, filePath) as Promise<void>,
+  stageAllFiles: (workspaceId: string) =>
+    ipcRenderer.invoke(desktopIpc.stageAllFiles, workspaceId) as Promise<void>,
+  unstageAllFiles: (workspaceId: string) =>
+    ipcRenderer.invoke(desktopIpc.unstageAllFiles, workspaceId) as Promise<void>,
+  commitStagedChanges: (workspaceId: string, message: string) =>
+    ipcRenderer.invoke(desktopIpc.commitStagedChanges, workspaceId, message) as Promise<void>,
+  generateCommitMessage: (workspaceId: string, sessionId?: string) =>
+    ipcRenderer.invoke(desktopIpc.generateCommitMessage, workspaceId, sessionId) as Promise<string>,
+  getCommitHistory: (workspaceId: string) =>
+    ipcRenderer.invoke(desktopIpc.getCommitHistory, workspaceId) as Promise<{ hash: string; subject: string; author: string; relativeTime: string; refs: readonly string[] }[]>,
   toggleWindowMaximize: () => ipcRenderer.invoke(desktopIpc.toggleWindowMaximize) as Promise<void>,
   openExternal: (url: string) => ipcRenderer.invoke(desktopIpc.openExternal, url) as Promise<void>,
   getThemeMode: () => ipcRenderer.invoke(desktopIpc.getThemeMode) as Promise<"system" | "light" | "dark">,

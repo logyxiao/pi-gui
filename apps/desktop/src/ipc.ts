@@ -116,6 +116,12 @@ export const desktopIpc = {
   getChangedFiles: "pi-gui:get-changed-files",
   getFileDiff: "pi-gui:get-file-diff",
   stageFile: "pi-gui:stage-file",
+  unstageFile: "pi-gui:unstage-file",
+  stageAllFiles: "pi-gui:stage-all-files",
+  unstageAllFiles: "pi-gui:unstage-all-files",
+  commitStagedChanges: "pi-gui:commit-staged-changes",
+  generateCommitMessage: "pi-gui:generate-commit-message",
+  getCommitHistory: "pi-gui:get-commit-history",
   getThemeMode: "pi-gui:get-theme-mode",
   getResolvedTheme: "pi-gui:get-resolved-theme",
   setThemeMode: "pi-gui:set-theme-mode",
@@ -342,9 +348,15 @@ export interface PiDesktopApi {
     options?: NavigateSessionTreeOptions,
   ): Promise<{ readonly state: DesktopAppState; readonly result: NavigateSessionTreeResult }>;
   listWorkspaceFiles(workspaceId: string): Promise<string[]>;
-  getChangedFiles(workspaceId: string): Promise<{ path: string; status: "added" | "modified" | "deleted" | "untracked"; staged: boolean }[]>;
-  getFileDiff(workspaceId: string, filePath: string): Promise<string>;
+  getChangedFiles(workspaceId: string): Promise<{ path: string; status: "added" | "modified" | "deleted" | "untracked"; staged: boolean; unstaged: boolean; indexStatus: string; worktreeStatus: string }[]>;
+  getFileDiff(workspaceId: string, filePath: string, staged?: boolean): Promise<string>;
   stageFile(workspaceId: string, filePath: string): Promise<void>;
+  unstageFile(workspaceId: string, filePath: string): Promise<void>;
+  stageAllFiles(workspaceId: string): Promise<void>;
+  unstageAllFiles(workspaceId: string): Promise<void>;
+  commitStagedChanges(workspaceId: string, message: string): Promise<void>;
+  generateCommitMessage(workspaceId: string, sessionId?: string): Promise<string>;
+  getCommitHistory(workspaceId: string): Promise<{ hash: string; subject: string; author: string; relativeTime: string; refs: readonly string[] }[]>;
   toggleWindowMaximize(): Promise<void>;
   openExternal(url: string): Promise<void>;
   getThemeMode(): Promise<"system" | "light" | "dark">;

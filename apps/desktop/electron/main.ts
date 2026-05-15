@@ -15,7 +15,17 @@ import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { DesktopAppStore } from "./app-store";
-import { getChangedFiles, getFileDiff, stageFile } from "./app-store-diff";
+import {
+  commitStagedChanges,
+  generateCommitMessage,
+  getCommitHistory,
+  getChangedFiles,
+  getFileDiff,
+  stageAllFiles,
+  stageFile,
+  unstageAllFiles,
+  unstageFile,
+} from "./app-store-diff";
 import { listWorkspaceFiles } from "./app-store-files";
 import { MAIN_DEV_RELOAD_MARKER } from "./dev-reload-main-probe";
 import { NotificationManager } from "./notification-manager";
@@ -48,7 +58,7 @@ import type {
   WorkspaceSessionTarget,
 } from "../src/desktop-state";
 import type { SessionDriverEvent } from "@pi-gui/session-driver";
-import type { GenerateThreadTitleOptions } from "@pi-gui/pi-sdk-driver";
+import type { GenerateCommitMessageOptions, GenerateThreadTitleOptions } from "@pi-gui/pi-sdk-driver";
 import type { WorkspaceRef } from "@pi-gui/session-driver";
 
 const isDev = Boolean(process.env.ELECTRON_RENDERER_URL);
@@ -265,6 +275,26 @@ function canPublishToWindow(window: BrowserWindow): boolean {
   return !window.isDestroyed() && !window.webContents.isDestroyed() && !window.webContents.isCrashed();
 }
 
+function resolveCommitMessageModel(
+  state: DesktopAppState,
+  workspaceId: string,
+  sessionId: string | undefined,
+): {
+  readonly model?: { readonly provider: string; readonly modelId: string };
+  readonly thinkingLevel?: string;
+} {
+  const workspace = state.workspaces.find((entry) => entry.id === workspaceId);
+  const session = workspace?.sessions.find((entry) => entry.id === sessionId);
+  const runtime = state.runtimeByWorkspace[workspaceId];
+  const provider = session?.config?.provider ?? runtime?.settings.defaultProvider;
+  const modelId = session?.config?.modelId ?? runtime?.settings.defaultModelId;
+  const thinkingLevel = session?.config?.thinkingLevel ?? runtime?.settings.defaultThinkingLevel;
+  return {
+    ...(provider && modelId ? { model: { provider, modelId } } : {}),
+    ...(thinkingLevel ? { thinkingLevel } : {}),
+  };
+}
+
 function resolveWindowTestMode(): "foreground" | "background" {
   return process.env.PI_APP_TEST_MODE?.trim().toLowerCase() === "background" ? "background" : "foreground";
 }
@@ -420,6 +450,9 @@ app.whenReady().then(async () => {
   let generateThreadTitleOverride:
     | ((workspace: WorkspaceRef, options: GenerateThreadTitleOptions) => Promise<string | null | undefined>)
     | undefined;
+  let generateCommitMessageOverride:
+    | ((workspace: WorkspaceRef, options: GenerateCommitMessageOptions) => Promise<string | null | undefined>)
+    | undefined;
   let deferredThreadTitle:
     | {
         resolve: (title: string | null) => void;
@@ -431,6 +464,7 @@ app.whenReady().then(async () => {
     initialWorkspacePaths: resolveInitialWorkspacePaths(),
     getWindow: () => mainWindow,
     generateThreadTitleOverride: async (workspace, options) => generateThreadTitleOverride?.(workspace, options),
+    generateCommitMessageOverride: async (workspace, options) => generateCommitMessageOverride?.(workspace, options),
   });
   await store.initialize();
   integratedTerminalShell = (await store.getState()).integratedTerminalShell;
@@ -470,6 +504,12 @@ app.whenReady().then(async () => {
           const pending = deferredThreadTitle;
           deferredThreadTitle = undefined;
           pending.reject(new Error("Deferred thread-title rejected by test"));
+        },
+        setCommitMessageOverride: (message: string | null) => {
+          generateCommitMessageOverride = async () => message;
+        },
+        clearCommitMessageOverride: () => {
+          generateCommitMessageOverride = undefined;
         },
       },
     });
@@ -720,12 +760,12 @@ app.whenReady().then(async () => {
     }
     return getChangedFiles(workspacePath);
   });
-  ipcMain.handle(desktopIpc.getFileDiff, async (_event, workspaceId: string, filePath: string) => {
+  ipcMain.handle(desktopIpc.getFileDiff, async (_event, workspaceId: string, filePath: string, staged?: boolean) => {
     const workspacePath = store.getWorkspacePath(workspaceId);
     if (!workspacePath) {
       return "";
     }
-    return getFileDiff(workspacePath, filePath);
+    return getFileDiff(workspacePath, filePath, staged === true);
   });
   ipcMain.handle(desktopIpc.stageFile, async (_event, workspaceId: string, filePath: string) => {
     const workspacePath = store.getWorkspacePath(workspaceId);
@@ -733,6 +773,57 @@ app.whenReady().then(async () => {
       throw new Error(`Unknown workspace: ${workspaceId}`);
     }
     await stageFile(workspacePath, filePath);
+  });
+  ipcMain.handle(desktopIpc.unstageFile, async (_event, workspaceId: string, filePath: string) => {
+    const workspacePath = store.getWorkspacePath(workspaceId);
+    if (!workspacePath) {
+      throw new Error(`Unknown workspace: ${workspaceId}`);
+    }
+    await unstageFile(workspacePath, filePath);
+  });
+  ipcMain.handle(desktopIpc.stageAllFiles, async (_event, workspaceId: string) => {
+    const workspacePath = store.getWorkspacePath(workspaceId);
+    if (!workspacePath) {
+      throw new Error(`Unknown workspace: ${workspaceId}`);
+    }
+    await stageAllFiles(workspacePath);
+  });
+  ipcMain.handle(desktopIpc.unstageAllFiles, async (_event, workspaceId: string) => {
+    const workspacePath = store.getWorkspacePath(workspaceId);
+    if (!workspacePath) {
+      throw new Error(`Unknown workspace: ${workspaceId}`);
+    }
+    await unstageAllFiles(workspacePath);
+  });
+  ipcMain.handle(desktopIpc.commitStagedChanges, async (_event, workspaceId: string, message: string) => {
+    const workspacePath = store.getWorkspacePath(workspaceId);
+    if (!workspacePath) {
+      throw new Error(`Unknown workspace: ${workspaceId}`);
+    }
+    await commitStagedChanges(workspacePath, message);
+  });
+  ipcMain.handle(desktopIpc.generateCommitMessage, async (_event, workspaceId: string, sessionId?: string) => {
+    const workspacePath = store.getWorkspacePath(workspaceId);
+    if (!workspacePath) {
+      throw new Error(`Unknown workspace: ${workspaceId}`);
+    }
+    const state = await store.getState();
+    return generateCommitMessage({
+      workspace: {
+        workspaceId,
+        path: workspacePath,
+        displayName: state.workspaces.find((workspace) => workspace.id === workspaceId)?.name,
+      },
+      driver: store.driver,
+      ...resolveCommitMessageModel(state, workspaceId, sessionId),
+    });
+  });
+  ipcMain.handle(desktopIpc.getCommitHistory, async (_event, workspaceId: string) => {
+    const workspacePath = store.getWorkspacePath(workspaceId);
+    if (!workspacePath) {
+      return [];
+    }
+    return getCommitHistory(workspacePath);
   });
   ipcMain.handle(desktopIpc.toggleWindowMaximize, (event) => {
     const window = BrowserWindow.fromWebContents(event.sender);

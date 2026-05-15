@@ -25,6 +25,7 @@ import {
 } from "./session-supervisor.js";
 import { RuntimeSupervisor, type RuntimeSupervisorOptions } from "./runtime-supervisor.js";
 import { createRuntimeDependencies } from "./runtime-deps.js";
+import { generateCommitMessage, type GenerateCommitMessageOptions } from "./commit-message-generator.js";
 import { generateThreadTitle, type GenerateThreadTitleOptions } from "./thread-title-generator.js";
 
 export interface PiSdkDriverConfig extends PiSdkDriverOptions, RuntimeSupervisorOptions {}
@@ -37,6 +38,9 @@ export class PiSdkDriver implements SessionDriver {
   private readonly generateThreadTitleOverride:
     | ((workspace: WorkspaceRef, options: GenerateThreadTitleOptions) => Promise<string | null | undefined>)
     | undefined;
+  private readonly generateCommitMessageOverride:
+    | ((workspace: WorkspaceRef, options: GenerateCommitMessageOptions) => Promise<string | null | undefined>)
+    | undefined;
   readonly runtimeSupervisor: RuntimeSupervisor;
 
   constructor(options: PiSdkDriverConfig = {}) {
@@ -45,6 +49,7 @@ export class PiSdkDriver implements SessionDriver {
     this.authStorage = deps.authStorage;
     this.modelRegistry = deps.modelRegistry;
     this.generateThreadTitleOverride = options.generateThreadTitleOverride;
+    this.generateCommitMessageOverride = options.generateCommitMessageOverride;
 
     this.supervisor = new SessionSupervisor({ ...options, modelRegistry: deps.modelRegistry });
     this.runtimeSupervisor = new RuntimeSupervisor({ ...options, ...deps });
@@ -163,6 +168,25 @@ export class PiSdkDriver implements SessionDriver {
       );
     }
     return generateThreadTitle(workspace, options, {
+      agentDir: this.agentDir,
+      authStorage: this.authStorage,
+      modelRegistry: this.modelRegistry,
+    });
+  }
+
+  generateCommitMessage(workspace: WorkspaceRef, options: GenerateCommitMessageOptions): Promise<string | null> {
+    if (this.generateCommitMessageOverride) {
+      return Promise.resolve(this.generateCommitMessageOverride(workspace, options)).then((override) =>
+        override !== undefined
+          ? override
+          : generateCommitMessage(workspace, options, {
+              agentDir: this.agentDir,
+              authStorage: this.authStorage,
+              modelRegistry: this.modelRegistry,
+            }),
+      );
+    }
+    return generateCommitMessage(workspace, options, {
       agentDir: this.agentDir,
       authStorage: this.authStorage,
       modelRegistry: this.modelRegistry,

@@ -70,6 +70,23 @@ export function ArrowUpIcon() {
   );
 }
 
+export function MinusIcon() {
+  return (
+    <Icon>
+      <path d="M4.25 10h11.5" stroke="currentColor" strokeLinecap="round" strokeWidth="1.7" />
+    </Icon>
+  );
+}
+
+export function ArrowDownIcon() {
+  return (
+    <Icon>
+      <path d="M10 4.8v10.4" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+      <path d="M5.8 11 10 15.2 14.2 11" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+    </Icon>
+  );
+}
+
 export function PiLogoMark() {
   return (
     <svg aria-hidden="true" viewBox="0 0 64 64" fill="none">

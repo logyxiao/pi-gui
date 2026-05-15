@@ -80,6 +80,10 @@ export interface PiSdkDriverOptions {
     workspace: WorkspaceRef,
     options: import("./thread-title-generator.js").GenerateThreadTitleOptions,
   ) => Promise<string | null | undefined>;
+  readonly generateCommitMessageOverride?: (
+    workspace: WorkspaceRef,
+    options: import("./commit-message-generator.js").GenerateCommitMessageOptions,
+  ) => Promise<string | null | undefined>;
 }
 
 export interface SyncWorkspaceResult {

@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   applyHostUiRequestToExtensionUiState,
+  type GenerateCommitMessageOptions,
   type GenerateThreadTitleOptions,
   isExtensionUiDialogRequest,
   JsonCatalogStore,
@@ -125,6 +126,10 @@ export interface DesktopAppStoreOptions {
     workspace: WorkspaceRef,
     options: GenerateThreadTitleOptions,
   ) => Promise<string | null | undefined>;
+  readonly generateCommitMessageOverride?: (
+    workspace: WorkspaceRef,
+    options: GenerateCommitMessageOptions,
+  ) => Promise<string | null | undefined>;
 }
 
 export class DesktopAppStore implements AppStoreInternals {
@@ -157,6 +162,9 @@ export class DesktopAppStore implements AppStoreInternals {
       catalogFilePath,
       ...(options.generateThreadTitleOverride
         ? { generateThreadTitleOverride: options.generateThreadTitleOverride }
+        : {}),
+      ...(options.generateCommitMessageOverride
+        ? { generateCommitMessageOverride: options.generateCommitMessageOverride }
         : {}),
     };
 
