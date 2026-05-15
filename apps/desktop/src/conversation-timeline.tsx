@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState, type MutableRefObject, type RefCallback, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MutableRefObject, type RefCallback, type RefObject } from "react";
 import type { TranscriptMessage } from "./desktop-state";
 import { ThreadSearchBar } from "./thread-search";
 import { TimelineItem } from "./timeline-item";
@@ -16,6 +16,16 @@ interface ThreadSearchModel {
   readonly search: (query: string) => void;
   readonly goToMatch: (direction: 1 | -1) => void;
   readonly close: () => void;
+}
+
+export interface ConversationTimelineNavItem {
+  readonly id: string;
+  readonly itemId: string;
+  readonly index: number;
+  readonly kind: "user";
+  readonly label: string;
+  readonly detail?: string;
+  readonly ordinal: number;
 }
 
 interface ConversationTimelineProps {
@@ -59,7 +69,12 @@ export function ConversationTimeline({
     !hasUnreliableVirtualizedHeights;
   const [expandedToolCallIds, setExpandedToolCallIds] = useState<Set<string>>(() => new Set());
   const measuredHeightsRef = useRef(new Map<string, number>());
+  const rowOffsetsRef = useRef<readonly number[]>([]);
+  const rowHeightsRef = useRef<readonly number[]>([]);
+  const pendingScrollTargetRef = useRef<{ readonly itemId: string; readonly index: number } | null>(null);
   const [measurementVersion, setMeasurementVersion] = useState(0);
+  const [activeNavItemId, setActiveNavItemId] = useState<string | null>(null);
+  const timelineNavItems = useMemo(() => buildConversationTimelineNavItems(transcript), [transcript]);
 
   useLayoutEffect(() => {
     const availableToolCallIds = new Set(
@@ -130,68 +145,168 @@ export function ConversationTimeline({
     setMeasurementVersion((current) => current + 1);
   }, []);
 
+  const updateVirtualMetrics = useCallback((offsets: readonly number[], heights: readonly number[]) => {
+    rowOffsetsRef.current = offsets;
+    rowHeightsRef.current = heights;
+  }, []);
+
+  const completePendingScroll = useCallback((behavior: ScrollBehavior = "smooth") => {
+    const pendingTarget = pendingScrollTargetRef.current;
+    const pane = timelinePaneRef.current;
+    if (!pendingTarget || !pane) {
+      return false;
+    }
+    const row = pane.querySelector<HTMLElement>(`[data-transcript-item-id="${cssEscape(pendingTarget.itemId)}"]`);
+    if (!row) {
+      return false;
+    }
+    row.scrollIntoView({ block: "center", behavior });
+    pendingScrollTargetRef.current = null;
+    return true;
+  }, [timelinePaneRef]);
+
+  const scrollToTranscriptIndex = useCallback((index: number, itemId: string) => {
+    const pane = timelinePaneRef.current;
+    if (!pane) {
+      return;
+    }
+    const mountedRow = pane.querySelector<HTMLElement>(`[data-transcript-item-id="${cssEscape(itemId)}"]`);
+    if (mountedRow) {
+      mountedRow.scrollIntoView({ block: "center", behavior: "smooth" });
+      return;
+    }
+
+    pendingScrollTargetRef.current = { itemId, index };
+    const offsets = rowOffsetsRef.current;
+    const estimatedTop = offsets[index] ?? estimateTranscriptOffset(transcript, index, measuredHeightsRef.current);
+    pane.scrollTo({ top: Math.max(0, estimatedTop - pane.clientHeight * 0.28), behavior: "auto" });
+
+    let attempts = 0;
+    const retry = () => {
+      attempts += 1;
+      if (completePendingScroll(attempts > 1 ? "auto" : "smooth") || attempts >= 12) {
+        return;
+      }
+      window.requestAnimationFrame(retry);
+    };
+    window.requestAnimationFrame(retry);
+  }, [completePendingScroll, timelinePaneRef, transcript]);
+
+  const syncActiveNavItem = useCallback(() => {
+    const pane = timelinePaneRef.current;
+    if (!pane || timelineNavItems.length === 0) {
+      setActiveNavItemId(null);
+      return;
+    }
+
+    const viewportAnchor = pane.scrollTop + pane.clientHeight * 0.32;
+    const offsets = rowOffsetsRef.current;
+    let closest: ConversationTimelineNavItem = timelineNavItems[0] ?? {
+      id: "",
+      itemId: "",
+      index: 0,
+      kind: "user",
+      label: "",
+      ordinal: 0,
+    };
+    let closestDistance = Number.POSITIVE_INFINITY;
+
+    for (const item of timelineNavItems) {
+      const row = pane.querySelector<HTMLElement>(`[data-transcript-item-id="${cssEscape(item.itemId)}"]`);
+      const rowTop = row
+        ? row.getBoundingClientRect().top - pane.getBoundingClientRect().top + pane.scrollTop
+        : offsets[item.index] ?? estimateTranscriptOffset(transcript, item.index, measuredHeightsRef.current);
+      const distance = Math.abs(rowTop - viewportAnchor);
+      if (distance < closestDistance) {
+        closest = item;
+        closestDistance = distance;
+      }
+    }
+
+    setActiveNavItemId((current) => (current === closest.id ? current : closest.id));
+  }, [timelineNavItems, timelinePaneRef, transcript]);
+
+  useEffect(() => {
+    syncActiveNavItem();
+  }, [measurementVersion, syncActiveNavItem, transcript]);
+
   const assignTimelinePaneRef = useCallback((node: HTMLDivElement | null) => {
     timelinePaneRef.current = node;
     timelinePaneElementRef?.(node);
   }, [timelinePaneElementRef, timelinePaneRef]);
 
   return (
-    <div
-      className="timeline-pane timeline-pane--thread"
-      data-testid="timeline-pane"
-      ref={assignTimelinePaneRef}
-      onScroll={onTimelineScroll}
-    >
-      {threadSearch.isOpen ? (
-        <ThreadSearchBar
-          query={threadSearch.query}
-          matchCount={threadSearch.matchCount}
-          activeIndex={threadSearch.activeIndex}
-          inputRef={threadSearch.inputRef}
-          onSearch={threadSearch.search}
-          onNext={() => threadSearch.goToMatch(1)}
-          onPrev={() => threadSearch.goToMatch(-1)}
-          onClose={threadSearch.close}
-        />
-      ) : null}
-      {isTranscriptLoading ? (
-        <div className="timeline" data-testid="transcript">
-          <div className="timeline-empty">Loading transcript…</div>
-        </div>
-      ) : transcript.length === 0 ? (
-        <div className="timeline" data-testid="transcript">
-          <div className="timeline-empty">Send a prompt to start the session.</div>
-        </div>
-      ) : shouldVirtualize ? (
-        <VirtualizedTranscriptList
+    <div className="timeline-pane-shell timeline-pane-shell--thread">
+      <div
+        className="timeline-pane timeline-pane--thread"
+        data-testid="timeline-pane"
+        ref={assignTimelinePaneRef}
+        onScroll={() => {
+          onTimelineScroll();
+          syncActiveNavItem();
+          completePendingScroll("auto");
+        }}
+      >
+        {threadSearch.isOpen ? (
+          <ThreadSearchBar
+            query={threadSearch.query}
+            matchCount={threadSearch.matchCount}
+            activeIndex={threadSearch.activeIndex}
+            inputRef={threadSearch.inputRef}
+            onSearch={threadSearch.search}
+            onNext={() => threadSearch.goToMatch(1)}
+            onPrev={() => threadSearch.goToMatch(-1)}
+            onClose={threadSearch.close}
+          />
+        ) : null}
+        {isTranscriptLoading ? (
+          <div className="timeline" data-testid="transcript">
+            <div className="timeline-empty">Loading transcript…</div>
+          </div>
+        ) : transcript.length === 0 ? (
+          <div className="timeline" data-testid="transcript">
+            <div className="timeline-empty">Send a prompt to start the session.</div>
+          </div>
+        ) : shouldVirtualize ? (
+          <VirtualizedTranscriptList
+            transcript={transcript}
+            timelinePaneRef={timelinePaneRef}
+            onContentHeightChange={onContentHeightChange}
+            measuredHeightsRef={measuredHeightsRef}
+            measurementVersion={measurementVersion}
+            expandedToolCallIds={expandedToolCallIds}
+            onHeightChange={updateMeasuredHeight}
+            onToggleToolCall={toggleToolCall}
+            onViewFileInDiff={onViewFileInDiff}
+            onVirtualMetricsChange={updateVirtualMetrics}
+          />
+        ) : (
+          <div className="timeline" data-testid="transcript">
+            {transcript.map((item) => (
+              <MeasuredTimelineItem
+                item={item}
+                key={item.id}
+                onHeightChange={updateMeasuredHeight}
+                expandedToolCallIds={expandedToolCallIds}
+                onToggleToolCall={toggleToolCall}
+                onViewFileInDiff={onViewFileInDiff}
+              />
+            ))}
+          </div>
+        )}
+        {showJumpToLatest ? (
+          <button className="timeline-jump" data-testid="timeline-jump" type="button" onClick={onJumpToLatest}>
+            Return to bottom
+          </button>
+        ) : null}
+      </div>
+      {timelineNavItems.length > 1 ? (
+        <ConversationTimelineNav
+          activeItemId={activeNavItemId}
+          items={timelineNavItems}
           transcript={transcript}
-          timelinePaneRef={timelinePaneRef}
-          onContentHeightChange={onContentHeightChange}
-          measuredHeightsRef={measuredHeightsRef}
-          measurementVersion={measurementVersion}
-          expandedToolCallIds={expandedToolCallIds}
-          onHeightChange={updateMeasuredHeight}
-          onToggleToolCall={toggleToolCall}
-          onViewFileInDiff={onViewFileInDiff}
+          onSelect={(item) => scrollToTranscriptIndex(item.index, item.itemId)}
         />
-      ) : (
-        <div className="timeline" data-testid="transcript">
-          {transcript.map((item) => (
-            <MeasuredTimelineItem
-              item={item}
-              key={item.id}
-              onHeightChange={updateMeasuredHeight}
-              expandedToolCallIds={expandedToolCallIds}
-              onToggleToolCall={toggleToolCall}
-              onViewFileInDiff={onViewFileInDiff}
-            />
-          ))}
-        </div>
-      )}
-      {showJumpToLatest ? (
-        <button className="timeline-jump" data-testid="timeline-jump" type="button" onClick={onJumpToLatest}>
-          New activity below
-        </button>
       ) : null}
     </div>
   );
@@ -207,6 +322,7 @@ function VirtualizedTranscriptList({
   onHeightChange,
   onToggleToolCall,
   onViewFileInDiff,
+  onVirtualMetricsChange,
 }: {
   readonly transcript: readonly TranscriptMessage[];
   readonly timelinePaneRef: MutableRefObject<HTMLDivElement | null>;
@@ -217,6 +333,7 @@ function VirtualizedTranscriptList({
   readonly onHeightChange: (id: string, height: number) => void;
   readonly onToggleToolCall: (callId: string) => void;
   readonly onViewFileInDiff?: (path: string) => void;
+  readonly onVirtualMetricsChange: (offsets: readonly number[], heights: readonly number[]) => void;
 }) {
   const [viewport, setViewport] = useState({ scrollTop: 0, height: 0 });
   const previousTotalHeightRef = useRef(0);
@@ -261,6 +378,7 @@ function VirtualizedTranscriptList({
       totalHeight += ROW_GAP_PX;
     }
   }
+  onVirtualMetricsChange(rowOffsets, rowHeights);
 
   useLayoutEffect(() => {
     if (previousTotalHeightRef.current === totalHeight) {
@@ -339,6 +457,7 @@ function MeasuredTimelineItem({
   return (
     <div
       className={className}
+      data-transcript-item-id={item.id}
       ref={rowRef}
       style={top == null ? undefined : { transform: `translateY(${top}px)` }}
     >
@@ -350,6 +469,201 @@ function MeasuredTimelineItem({
       />
     </div>
   );
+}
+
+function ConversationTimelineNav({
+  activeItemId,
+  items,
+  transcript,
+  onSelect,
+}: {
+  readonly activeItemId: string | null;
+  readonly items: readonly ConversationTimelineNavItem[];
+  readonly transcript: readonly TranscriptMessage[];
+  readonly onSelect: (item: ConversationTimelineNavItem) => void;
+}) {
+  const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
+  const denominator = Math.max(items.length - 1, 1);
+  const hoveredItem = items.find((item) => item.id === hoveredItemId);
+  const hoveredItemIndex = hoveredItem ? items.findIndex((item) => item.id === hoveredItem.id) : -1;
+
+  const updateHoverFromPointer = (clientY: number, element: HTMLElement) => {
+    const rect = element.getBoundingClientRect();
+    const progress = Math.max(0, Math.min(1, (clientY - rect.top - 8) / Math.max(1, rect.height - 16)));
+    const nextIndex = Math.max(0, Math.min(items.length - 1, Math.round(progress * denominator)));
+    setHoveredItemId(items[nextIndex]?.id ?? null);
+  };
+
+  return (
+    <nav
+      className="conversation-nav"
+      aria-label="Conversation timeline"
+      data-testid="conversation-nav"
+      onMouseEnter={(event) => updateHoverFromPointer(event.clientY, event.currentTarget)}
+      onMouseMove={(event) => updateHoverFromPointer(event.clientY, event.currentTarget)}
+      onMouseLeave={() => setHoveredItemId(null)}
+    >
+      <div className="conversation-nav__rail" aria-hidden="true" />
+      {items.map((item, itemIndex) => {
+        const isActive = activeItemId === item.id;
+        const isHovered = hoveredItemId === item.id;
+        return (
+          <div
+            className={`conversation-nav__item ${isActive ? "conversation-nav__item--active" : ""} ${isHovered ? "conversation-nav__item--hovered" : ""}`}
+            key={item.id}
+            style={{ "--timeline-nav-progress": itemIndex / denominator } as CSSProperties}
+          >
+            <button
+              aria-label={item.label}
+              className="conversation-nav__trigger"
+              type="button"
+              title={item.label}
+              onClick={() => onSelect(item)}
+              onFocus={() => setHoveredItemId(item.id)}
+            >
+              <span className="conversation-nav__pill" aria-hidden="true" />
+            </button>
+          </div>
+        );
+      })}
+      {hoveredItem ? (
+        <ConversationNavPopover
+          item={hoveredItem}
+          items={items}
+          transcript={transcript}
+          onSelect={onSelect}
+          progress={Math.max(0, hoveredItemIndex) / denominator}
+        />
+      ) : null}
+    </nav>
+  );
+}
+
+function ConversationNavPopover({
+  item,
+  items,
+  transcript,
+  onSelect,
+  progress,
+}: {
+  readonly item: ConversationTimelineNavItem;
+  readonly items: readonly ConversationTimelineNavItem[];
+  readonly transcript: readonly TranscriptMessage[];
+  readonly onSelect: (item: ConversationTimelineNavItem) => void;
+  readonly progress: number;
+}) {
+  const rows = getConversationNavPopoverRows(transcript, item.index);
+  return (
+    <span
+      className="conversation-nav__popover"
+      role="tooltip"
+      style={{ "--timeline-popover-y": progress } as CSSProperties}
+    >
+      <span className="conversation-nav__popover-list">
+        {rows.map((row) => {
+          const targetItem = items.find((candidate) => candidate.index === row.index);
+          return (
+            <button
+              className={`conversation-nav__popover-row ${row.current ? "conversation-nav__popover-row--current" : ""}`}
+              key={`${row.index}:${row.label}`}
+              type="button"
+              onClick={() => {
+                if (targetItem) {
+                  onSelect(targetItem);
+                }
+              }}
+            >
+              <span className="conversation-nav__popover-text">{row.label}</span>
+            </button>
+          );
+        })}
+      </span>
+    </span>
+  );
+}
+
+function buildConversationTimelineNavItems(transcript: readonly TranscriptMessage[]): readonly ConversationTimelineNavItem[] {
+  let ordinal = 0;
+  return transcript.flatMap((item, index) => {
+    const navKind = getConversationNavKind(item);
+    if (!navKind) {
+      return [];
+    }
+    ordinal += 1;
+    return [{
+      id: `${item.id}:${navKind}`,
+      itemId: item.id,
+      index,
+      kind: navKind,
+      label: getConversationNavLabel(ordinal),
+      detail: getConversationNavDetail(item),
+      ordinal,
+    }];
+  });
+}
+
+function getConversationNavKind(item: TranscriptMessage): ConversationTimelineNavItem["kind"] | null {
+  return item.kind === "message" && item.role === "user" ? "user" : null;
+}
+
+function getConversationNavLabel(ordinal: number): string {
+  return `Item ${ordinal}`;
+}
+
+function getConversationNavDetail(_item: TranscriptMessage): string | undefined {
+  return undefined;
+}
+
+function getConversationNavPopoverRows(transcript: readonly TranscriptMessage[], targetIndex: number): Array<{
+  readonly index: number;
+  readonly label: string;
+  readonly current: boolean;
+}> {
+  const messageRows = transcript
+    .map((item, index) => ({ item, index }))
+    .filter((entry): entry is { readonly item: Extract<TranscriptMessage, { kind: "message" }>; readonly index: number } =>
+      entry.item.kind === "message" && entry.item.role === "user",
+    );
+  const targetMessageIndex = messageRows.findIndex((entry) => entry.index === targetIndex);
+  const safeTargetIndex = targetMessageIndex >= 0 ? targetMessageIndex : 0;
+  const start = Math.max(0, Math.min(messageRows.length - 7, safeTargetIndex - 3));
+  return messageRows.slice(start, start + 7).map(({ item, index }) => ({
+    index,
+    label: compactPopoverText(item.text),
+    current: index === targetIndex,
+  }));
+}
+
+function compactPopoverText(value: string): string {
+  const compact = value.replace(/\s+/g, " ").trim();
+  if (!compact) {
+    return "Empty message";
+  }
+  return compact.length > 76 ? `${compact.slice(0, 73)}…` : compact;
+}
+
+function estimateTranscriptOffset(
+  transcript: readonly TranscriptMessage[],
+  index: number,
+  measuredHeights: ReadonlyMap<string, number>,
+): number {
+  let offset = 0;
+  for (let currentIndex = 0; currentIndex < index; currentIndex += 1) {
+    const item = transcript[currentIndex];
+    if (!item) {
+      continue;
+    }
+    offset += measuredHeights.get(item.id) ?? estimateTimelineItemHeight(item);
+    offset += ROW_GAP_PX;
+  }
+  return offset;
+}
+
+function cssEscape(value: string): string {
+  if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
+    return CSS.escape(value);
+  }
+  return value.replace(/["\\]/g, "\\$&");
 }
 
 function findStartIndex(offsets: readonly number[], heights: readonly number[], targetOffset: number): number {
