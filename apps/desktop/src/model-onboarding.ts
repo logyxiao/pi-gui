@@ -1,6 +1,8 @@
 import type { RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
 import { buildModelOptions } from "./composer-commands";
 
+export type ModelOnboardingTranslator = (key: never, values?: Record<string, string>) => string;
+
 export type ModelOnboardingSettingsSection = "models" | "providers";
 
 export interface ModelOnboardingNotice {
@@ -27,6 +29,7 @@ interface ModelSelectionInput {
 export function deriveModelOnboardingState(
   runtime: RuntimeSnapshot | undefined,
   currentSelection: ModelSelectionInput,
+  t?: ModelOnboardingTranslator,
 ): ModelOnboardingState {
   const selectableModels = buildModelOptions(runtime);
   const selectableSet = new Set(selectableModels.map((model) => `${model.providerId}:${model.modelId}`));
@@ -45,23 +48,23 @@ export function deriveModelOnboardingState(
     return {
       hasSelectableModels: false,
       requiresModelSelection: true,
-      unselectedModelLabel: "No models available",
-      emptyModelTitle: "No models available",
+      unselectedModelLabel: translate(t, "modelOnboarding.noModelsAvailable"),
+      emptyModelTitle: translate(t, "modelOnboarding.noModelsAvailable"),
       emptyModelDescription:
         connectedProviderCount > 0
-          ? "Open Settings > Models to enable models."
-          : "Open Settings > Providers to connect a provider and make models available.",
+          ? translate(t, "modelOnboarding.enableModelsDescription")
+          : translate(t, "modelOnboarding.connectProviderDescription"),
       notice: connectedProviderCount > 0
         ? {
-            title: "No models available",
-            description: "All available models are currently disabled. Open Settings > Models to enable models.",
-            actionLabel: "Open Settings > Models",
+            title: translate(t, "modelOnboarding.noModelsAvailable"),
+            description: translate(t, "modelOnboarding.allModelsDisabledDescription"),
+            actionLabel: translate(t, "modelOnboarding.openModelsSettings"),
             actionSection: "models",
           }
         : {
-            title: "No models available",
-            description: "Connect a provider in Settings > Providers before choosing a model or setting a default.",
-            actionLabel: "Open Settings > Providers",
+            title: translate(t, "modelOnboarding.noModelsAvailable"),
+            description: translate(t, "modelOnboarding.connectProviderNotice"),
+            actionLabel: translate(t, "modelOnboarding.openProvidersSettings"),
             actionSection: "providers",
           },
     };
@@ -71,15 +74,15 @@ export function deriveModelOnboardingState(
     return {
       hasSelectableModels: true,
       requiresModelSelection: true,
-      unselectedModelLabel: "Pick a model",
-      emptyModelTitle: "No models available",
-      emptyModelDescription: "Pick a model.",
+      unselectedModelLabel: translate(t, "modelOnboarding.pickModel"),
+      emptyModelTitle: translate(t, "modelOnboarding.noModelsAvailable"),
+      emptyModelDescription: translate(t, "modelOnboarding.pickModelDescription"),
       notice: {
-        title: "Selected model unavailable",
+        title: translate(t, "modelOnboarding.selectedUnavailableTitle"),
         description: hasDefaultModel
-          ? "The model selected for this thread is no longer available. Choose another model, then open Settings > Models to update the default."
-          : "The model selected for this thread is no longer available. Choose another model, then open Settings > Models to choose the app default.",
-        actionLabel: "Open Settings > Models",
+          ? translate(t, "modelOnboarding.selectedUnavailableHasDefault")
+          : translate(t, "modelOnboarding.selectedUnavailableNoDefault"),
+        actionLabel: translate(t, "modelOnboarding.openModelsSettings"),
         actionSection: "models",
       },
     };
@@ -89,15 +92,15 @@ export function deriveModelOnboardingState(
     return {
       hasSelectableModels: true,
       requiresModelSelection: !currentSelectionUsable,
-      unselectedModelLabel: "Pick a model",
-      emptyModelTitle: "No default model set",
-      emptyModelDescription: "Pick a model.",
+      unselectedModelLabel: translate(t, "modelOnboarding.pickModel"),
+      emptyModelTitle: translate(t, "modelOnboarding.noDefaultTitle"),
+      emptyModelDescription: translate(t, "modelOnboarding.pickModelDescription"),
       notice: currentSelectionUsable
         ? undefined
         : {
-            title: "No default model set",
-            description: "Set a default model in Settings > Models.",
-            actionLabel: "Open Settings > Models",
+            title: translate(t, "modelOnboarding.noDefaultTitle"),
+            description: translate(t, "modelOnboarding.noDefaultDescription"),
+            actionLabel: translate(t, "modelOnboarding.openModelsSettings"),
             actionSection: "models",
           },
     };
@@ -108,15 +111,15 @@ export function deriveModelOnboardingState(
     return {
       hasSelectableModels: true,
       requiresModelSelection: !currentSelectionUsable,
-      unselectedModelLabel: "Pick a model",
-      emptyModelTitle: "Default model unavailable",
-      emptyModelDescription: "Pick a model.",
+      unselectedModelLabel: translate(t, "modelOnboarding.pickModel"),
+      emptyModelTitle: translate(t, "modelOnboarding.defaultUnavailableTitle"),
+      emptyModelDescription: translate(t, "modelOnboarding.pickModelDescription"),
       notice: {
         title: "Default model unavailable",
         description: currentSelectionUsable
-          ? `Your saved default (${defaultLabel}) is no longer available. Open Settings > Models to update it.`
-          : `Your saved default (${defaultLabel}) is no longer available. Choose a model for this thread, then open Settings > Models to update it.`,
-        actionLabel: "Open Settings > Models",
+          ? translate(t, "modelOnboarding.defaultUnavailableUsable", { model: defaultLabel })
+          : translate(t, "modelOnboarding.defaultUnavailableNeedsChoice", { model: defaultLabel }),
+        actionLabel: translate(t, "modelOnboarding.openModelsSettings"),
         actionSection: "models",
       },
     };
@@ -125,9 +128,9 @@ export function deriveModelOnboardingState(
   return {
     hasSelectableModels: true,
     requiresModelSelection: false,
-    unselectedModelLabel: "Pick a model",
-    emptyModelTitle: "No models available",
-    emptyModelDescription: "Pick a model.",
+    unselectedModelLabel: translate(t, "modelOnboarding.pickModel"),
+    emptyModelTitle: translate(t, "modelOnboarding.noModelsAvailable"),
+    emptyModelDescription: translate(t, "modelOnboarding.pickModelDescription"),
   };
 }
 
@@ -136,4 +139,33 @@ function isUsableSelection(
   selectableSet: ReadonlySet<string>,
 ): boolean {
   return Boolean(selection.provider && selection.modelId && selectableSet.has(`${selection.provider}:${selection.modelId}`));
+}
+
+const fallbackTranslations: Record<string, string> = {
+  "modelOnboarding.noModelsAvailable": "No models available",
+  "modelOnboarding.enableModelsDescription": "Open Settings > Models to enable models.",
+  "modelOnboarding.connectProviderDescription": "Open Settings > Providers to connect a provider and make models available.",
+  "modelOnboarding.allModelsDisabledDescription": "All available models are currently disabled. Open Settings > Models to enable models.",
+  "modelOnboarding.connectProviderNotice": "Connect a provider in Settings > Providers before choosing a model or setting a default.",
+  "modelOnboarding.openModelsSettings": "Open Settings > Models",
+  "modelOnboarding.openProvidersSettings": "Open Settings > Providers",
+  "modelOnboarding.pickModel": "Pick a model",
+  "modelOnboarding.pickModelDescription": "Pick a model.",
+  "modelOnboarding.selectedUnavailableTitle": "Selected model unavailable",
+  "modelOnboarding.selectedUnavailableHasDefault": "The model selected for this thread is no longer available. Choose another model, then open Settings > Models to update the default.",
+  "modelOnboarding.selectedUnavailableNoDefault": "The model selected for this thread is no longer available. Choose another model, then open Settings > Models to choose the app default.",
+  "modelOnboarding.noDefaultTitle": "No default model set",
+  "modelOnboarding.noDefaultDescription": "Set a default model in Settings > Models.",
+  "modelOnboarding.defaultUnavailableTitle": "Default model unavailable",
+  "modelOnboarding.defaultUnavailableUsable": "Your saved default ({model}) is no longer available. Open Settings > Models to update it.",
+  "modelOnboarding.defaultUnavailableNeedsChoice": "Your saved default ({model}) is no longer available. Choose a model for this thread, then open Settings > Models to update it.",
+};
+
+function translate(t: ModelOnboardingTranslator | undefined, key: string, values?: Record<string, string>): string {
+  if (t) return t(key as never, values);
+  let text = fallbackTranslations[key] ?? key;
+  for (const [name, value] of Object.entries(values ?? {})) {
+    text = text.replaceAll(`{${name}}`, value);
+  }
+  return text;
 }

@@ -118,7 +118,7 @@ export function ModelSelector({
                           key={`${option.providerId}:${option.modelId}`}
                           type="button"
                           onClick={() => {
-                            if (!isActive) onSetModel(option.providerId, option.modelId);
+                            onSetModel(option.providerId, option.modelId);
                             setOpen("none");
                           }}
                         >

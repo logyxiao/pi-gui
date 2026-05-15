@@ -360,11 +360,11 @@ export default function App({
   const selectedSessionModelOnboarding = deriveModelOnboardingState(selectedModelRuntime, {
     provider: resolvedSessionProvider,
     modelId: resolvedSessionModelId,
-  });
+  }, t);
   const newThreadModelOnboarding = deriveModelOnboardingState(newThreadRuntime, {
     provider: resolvedNewThreadProvider,
     modelId: resolvedNewThreadModelId,
-  });
+  }, t);
   const [attachmentsClearedOnSubmit, setAttachmentsClearedOnSubmit] = useState(false);
   const composerAttachments = attachmentsClearedOnSubmit ? [] : (snapshot?.composerAttachments ?? []);
   const queuedComposerMessages = snapshot?.queuedComposerMessages ?? [];

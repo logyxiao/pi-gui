@@ -26,12 +26,12 @@
 }
 
 :root.dark .timeline-item--summary-card {
-  border-color: rgba(210, 177, 98, 0.22);
-  background: linear-gradient(180deg, rgba(71, 55, 28, 0.58) 0%, rgba(46, 38, 24, 0.78) 100%);
+  border-color: var(--line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055) 0%, rgba(255, 255, 255, 0.035) 100%);
 }
 
 :root.dark .timeline-item__summary-eyebrow {
-  color: #f2cd79;
+  color: var(--muted-strong);
 }
 
 :root.dark .timeline-item__attachment {
@@ -41,6 +41,19 @@
 
 :root.dark .timeline-item__attachment--file {
   background: rgba(255, 255, 255, 0.04);
+}
+
+:root.dark .conversation-nav__item {
+  color: var(--muted-soft);
+}
+
+:root.dark .conversation-nav__item--hovered,
+:root.dark .conversation-nav__item--active {
+  color: var(--muted-strong);
+}
+
+:root.dark .conversation-nav__item--active .conversation-nav__pill {
+  box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.08);
 }
 
 :root.dark .timeline-summary::before,
@@ -69,24 +82,39 @@
 
 :root.dark .composer {
   background:
-    linear-gradient(180deg, rgba(30, 31, 34, 0) 0%, rgba(30, 31, 34, 0.9) 24%, rgba(30, 31, 34, 1) 54%);
+    linear-gradient(180deg, oklch(23% 0.006 270 / 0) 0%, oklch(23% 0.006 270 / 0.9) 24%, oklch(23% 0.006 270) 54%);
 }
 
 :root.dark .composer__surface {
   border-color: var(--line);
-  background: var(--surface);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+  background: oklch(27% 0.008 270);
+  box-shadow:
+    0 16px 40px oklch(5% 0.01 270 / 0.36),
+    0 1px 0 oklch(100% 0.004 270 / 0.045) inset;
+}
+
+:root.dark .composer__surface:focus-within {
+  border-color: oklch(70% 0.08 265);
+  background: oklch(28.5% 0.009 270);
+  box-shadow:
+    0 18px 44px oklch(5% 0.01 270 / 0.42),
+    0 0 0 3px oklch(70% 0.08 265 / 0.18),
+    0 1px 0 oklch(100% 0.004 270 / 0.055) inset;
 }
 
 :root.dark .composer__surface--drag-active {
-  border-color: #8fa0ff;
-  background: rgba(78, 90, 140, 0.18);
-  box-shadow: 0 0 0 3px rgba(143, 160, 255, 0.18), 0 12px 28px rgba(0, 0, 0, 0.36);
+  border-color: oklch(76% 0.09 265);
+  background: oklch(32% 0.025 265);
+  box-shadow: 0 0 0 3px oklch(76% 0.09 265 / 0.2), 0 12px 28px oklch(5% 0.01 270 / 0.38);
 }
 
 :root.dark .composer__drop-indicator {
   background: rgba(143, 160, 255, 0.16);
   color: #c6d0ff;
+}
+
+:root.dark .composer textarea::placeholder {
+  color: oklch(68% 0.018 265);
 }
 
 :root.dark .composer__slash-intent {

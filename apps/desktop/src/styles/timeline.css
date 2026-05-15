@@ -212,7 +212,7 @@
 
 .conversation-nav__item--hovered,
 .conversation-nav__item--active {
-  color: var(--accent);
+  color: oklch(54% 0.018 268);
 }
 
 .conversation-nav__item--hovered .conversation-nav__pill,
@@ -226,7 +226,7 @@
   width: 11px;
   height: 30px;
   opacity: 1;
-  box-shadow: 0 0 0 6px oklch(55% 0.18 272 / 0.14);
+  box-shadow: 0 0 0 6px oklch(54% 0.018 268 / 0.14);
 }
 
 .conversation-nav__popover {
@@ -338,13 +338,13 @@
   margin: 0 auto;
   padding: 14px 16px;
   border-radius: 18px;
-  border: 1px solid rgba(210, 177, 98, 0.36);
-  background: linear-gradient(180deg, rgba(255, 247, 226, 0.92) 0%, rgba(255, 252, 244, 0.98) 100%);
+  border: 1px solid oklch(84% 0.012 268 / 0.72);
+  background: linear-gradient(180deg, oklch(97.6% 0.006 268 / 0.88) 0%, oklch(99% 0.004 268 / 0.96) 100%);
 }
 
 .timeline-item__summary-eyebrow {
   margin-bottom: 8px;
-  color: #8c5b0c;
+  color: var(--muted-strong);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;

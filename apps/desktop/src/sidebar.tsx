@@ -342,7 +342,7 @@ function WorkspaceGroupContent(
             <span className="workspace-row__icon-folder"><FolderIcon /></span>
             <span className="workspace-row__icon-chevron"><ChevronDownIcon /></span>
           </span>
-          <span className="workspace-row__name">{rootWorkspace.name}</span>
+          <span className="workspace-row__name" title={rootWorkspace.path}>{rootWorkspace.name}</span>
         </button>
         <span
           className="workspace-row__menu-wrap"
