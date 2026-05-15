@@ -1,0 +1,97 @@
+.toggle-switch {
+  width: 34px;
+  height: 20px;
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.toggle-switch:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.toggle-switch__track {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  display: block;
+  border: 1px solid var(--control-border);
+  border-radius: 999px;
+  background: oklch(92.8% 0.012 268);
+  box-shadow: inset 0 1px 2px oklch(28% 0.02 268 / 0.08);
+  transition:
+    border-color 160ms cubic-bezier(0.22, 1, 0.36, 1),
+    background 160ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.toggle-switch__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: oklch(99% 0.004 268);
+  box-shadow:
+    0 1px 2px oklch(24% 0.02 268 / 0.18),
+    0 0 0 1px oklch(82% 0.018 268 / 0.7);
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.toggle-switch:hover:not(:disabled) .toggle-switch__track,
+.toggle-switch:focus-visible .toggle-switch__track {
+  border-color: var(--control-border-hover);
+  background: oklch(90.6% 0.014 268);
+}
+
+.toggle-switch:focus-visible {
+  outline: none;
+}
+
+.toggle-switch:focus-visible .toggle-switch__track {
+  box-shadow:
+    inset 0 1px 2px oklch(28% 0.02 268 / 0.08),
+    0 0 0 3px var(--control-focus);
+}
+
+.toggle-switch--checked .toggle-switch__track {
+  border-color: oklch(61% 0.046 268);
+  background: oklch(50% 0.035 268);
+}
+
+.toggle-switch--checked .toggle-switch__thumb {
+  transform: translateX(14px);
+}
+
+.toggle-switch--checked:hover:not(:disabled) .toggle-switch__track,
+.toggle-switch--checked:focus-visible .toggle-switch__track {
+  border-color: oklch(56% 0.052 268);
+  background: oklch(46% 0.04 268);
+}
+
+:root.dark .toggle-switch__track {
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+:root.dark .toggle-switch__thumb {
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.32);
+}
+
+:root.dark .toggle-switch:hover:not(:disabled) .toggle-switch__track,
+:root.dark .toggle-switch:focus-visible .toggle-switch__track {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+:root.dark .toggle-switch--checked .toggle-switch__track {
+  border-color: rgba(168, 160, 255, 0.44);
+  background: rgba(124, 107, 245, 0.48);
+}

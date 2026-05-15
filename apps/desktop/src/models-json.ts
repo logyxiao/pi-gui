@@ -17,6 +17,9 @@ export interface ModelsJsonProviderConfig {
   readonly headers?: Record<string, string>;
   readonly balanceBaseUrl?: string;
   readonly balanceApiKey?: string;
+  readonly usageScript?: string;
+  readonly usageLastValue?: string;
+  readonly usageLastCheckedAt?: string;
   readonly enabled?: boolean;
   readonly models?: readonly ModelsJsonModelConfig[];
 }
@@ -31,6 +34,13 @@ export interface ModelsJsonSaveResult {
   readonly providerCount: number;
   readonly modelCount: number;
   readonly enabledCount: number;
+}
+
+export interface CcSwitchSyncResult extends ModelsJsonSaveResult {
+  readonly sourcePath: string;
+  readonly importedProviderCount: number;
+  readonly importedModelCount: number;
+  readonly syncedPatternCount: number;
 }
 
 export interface ProviderProbeResult {

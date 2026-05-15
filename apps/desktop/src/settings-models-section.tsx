@@ -10,6 +10,7 @@ import {
 } from "./settings-utils";
 import { useI18n, type I18nContextValue } from "./i18n";
 import { SearchableSelect } from "./searchable-select";
+import { ToggleSwitch } from "./toggle-switch";
 
 interface SettingsModelsSectionProps {
   readonly runtime?: RuntimeSnapshot;
@@ -106,11 +107,12 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<StatusMessage | undefined>();
   const [renameValue, setRenameValue] = useState("");
-  const [newProviderId, setNewProviderId] = useState("");
-  const [newModelId, setNewModelId] = useState("");
+  const [editingProviderId, setEditingProviderId] = useState(false);
   const [providerQuery, setProviderQuery] = useState("");
   const [modelQuery, setModelQuery] = useState("");
-  const [headersText, setHeadersText] = useState("{}");
+  const [balanceDialogOpen, setBalanceDialogOpen] = useState(false);
+  const [balanceBaseUrlDraft, setBalanceBaseUrlDraft] = useState("");
+  const [balanceApiKeyDraft, setBalanceApiKeyDraft] = useState("");
   const providerIds = useMemo(() => Object.keys(modelsJson.providers).sort((a, b) => a.localeCompare(b)), [modelsJson]);
   const filteredProviderIds = useMemo(() => {
     const query = providerQuery.trim().toLowerCase();
@@ -120,9 +122,10 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
   const selectedProvider = selectedProviderId ? modelsJson.providers[selectedProviderId] : undefined;
   const selectedModels = selectedProvider?.models ?? [];
   const filteredSelectedModels = useMemo(() => {
+    const entries = selectedModels.map((model, index) => ({ model, index }));
     const query = modelQuery.trim().toLowerCase();
-    if (!query) return selectedModels;
-    return selectedModels.filter((model) => [model.id, model.name ?? ""].some((value) => value.toLowerCase().includes(query)));
+    if (!query) return entries;
+    return entries.filter(({ model }) => [model.id, model.name ?? ""].some((value) => value.toLowerCase().includes(query)));
   }, [modelQuery, selectedModels]);
 
   useEffect(() => {
@@ -154,7 +157,10 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
 
   useEffect(() => {
     setRenameValue(selectedProviderId);
-    setHeadersText(JSON.stringify(selectedProvider?.headers ?? {}, null, 2));
+    setEditingProviderId(false);
+    setBalanceDialogOpen(false);
+    setBalanceBaseUrlDraft(selectedProvider?.balanceBaseUrl ?? "");
+    setBalanceApiKeyDraft(selectedProvider?.balanceApiKey ?? "");
   }, [selectedProvider?.headers, selectedProviderId]);
 
   const setProvider = (providerId: string, updater: (provider: ModelsJsonProviderConfig) => ModelsJsonProviderConfig) => {
@@ -167,33 +173,47 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
   };
 
   const addProvider = () => {
-    const id = newProviderId.trim();
-    if (!id) return;
-    if (modelsJson.providers[id]) {
-      setStatus({ kind: "error", text: t("settings.models.providerExists", { id }) });
-      return;
+    const baseId = "new-provider";
+    let id = baseId;
+    let index = 2;
+    while (modelsJson.providers[id]) {
+      id = `${baseId}-${index}`;
+      index += 1;
     }
     setModelsJson((current) => ({
       providers: {
         ...current.providers,
-        [id]: { enabled: true, authHeader: true, models: [] },
+        [id]: { enabled: true, authHeader: true, baseUrl: "", api: "", apiKey: "", balanceBaseUrl: "", balanceApiKey: "", headers: {}, models: [] },
       },
     }));
+    setProviderQuery("");
     setSelectedProviderId(id);
-    setNewProviderId("");
+    setRenameValue(id);
+    setEditingProviderId(true);
     setStatus({ kind: "ok", text: t("settings.models.providerAdded", { id }) });
   };
 
   const renameProvider = () => {
     const nextId = renameValue.trim();
-    if (!selectedProviderId || !selectedProvider || !nextId || nextId === selectedProviderId) return;
+    if (!selectedProviderId || !selectedProvider || !nextId) {
+      setRenameValue(selectedProviderId);
+      setEditingProviderId(false);
+      return;
+    }
+    if (nextId === selectedProviderId) {
+      setEditingProviderId(false);
+      return;
+    }
     if (modelsJson.providers[nextId]) {
       setStatus({ kind: "error", text: t("settings.models.providerExists", { id: nextId }) });
+      setRenameValue(selectedProviderId);
+      setEditingProviderId(false);
       return;
     }
     const { [selectedProviderId]: _old, ...rest } = modelsJson.providers;
     setModelsJson({ providers: { ...rest, [nextId]: selectedProvider } });
     setSelectedProviderId(nextId);
+    setEditingProviderId(false);
     setStatus({ kind: "ok", text: t("settings.models.providerRenamed", { id: nextId }) });
   };
 
@@ -206,54 +226,42 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
     setStatus({ kind: "ok", text: t("settings.models.providerDeleted", { id: selectedProviderId }) });
   };
 
-  const applyProviderHeaders = (): ModelsJsonFile => {
-    if (!selectedProviderId) return modelsJson;
-    const headers = parseHeaders(headersText, t);
-    return {
-      providers: {
-        ...modelsJson.providers,
-        [selectedProviderId]: {
-          ...(modelsJson.providers[selectedProviderId] ?? { enabled: true, models: [] }),
-          headers,
-        },
-      },
-    };
+  const openBalanceDialog = () => {
+    setBalanceBaseUrlDraft(selectedProvider?.balanceBaseUrl ?? "");
+    setBalanceApiKeyDraft(selectedProvider?.balanceApiKey ?? "");
+    setBalanceDialogOpen(true);
   };
 
-  const updateProviderHeaders = () => {
-    try {
-      const nextModelsJson = applyProviderHeaders();
-      setModelsJson(nextModelsJson);
-      setStatus({ kind: "ok", text: t("settings.models.headersApplied") });
-    } catch (error) {
-      setStatus({ kind: "error", text: describeError(error, t) });
-    }
+  const applyBalanceSettings = () => {
+    if (!selectedProviderId) return;
+    setProvider(selectedProviderId, (provider) => ({
+      ...provider,
+      balanceBaseUrl: balanceBaseUrlDraft,
+      balanceApiKey: balanceApiKeyDraft,
+    }));
+    setBalanceDialogOpen(false);
+    setStatus({ kind: "ok", text: t("settings.models.balanceSaved") });
   };
 
   const addModel = () => {
-    const id = newModelId.trim();
-    if (!selectedProviderId || !id) return;
-    if (selectedModels.some((model) => model.id === id)) {
-      setStatus({ kind: "error", text: t("settings.models.modelExists", { id }) });
-      return;
-    }
-    setProvider(selectedProviderId, (provider) => ({ ...provider, models: [...(provider.models ?? []), { id, enabled: true }] }));
-    setNewModelId("");
+    if (!selectedProviderId) return;
+    setModelQuery("");
+    setProvider(selectedProviderId, (provider) => ({ ...provider, models: [...(provider.models ?? []), { id: "", enabled: true }] }));
   };
 
-  const updateModel = (modelId: string, updater: (model: ModelsJsonModelConfig) => ModelsJsonModelConfig) => {
+  const updateModel = (modelIndex: number, updater: (model: ModelsJsonModelConfig) => ModelsJsonModelConfig) => {
     if (!selectedProviderId) return;
     setProvider(selectedProviderId, (provider) => ({
       ...provider,
-      models: (provider.models ?? []).map((model) => (model.id === modelId ? updater(model) : model)),
+      models: (provider.models ?? []).map((model, index) => (index === modelIndex ? updater(model) : model)),
     }));
   };
 
-  const deleteModel = (modelId: string) => {
+  const deleteModel = (modelIndex: number) => {
     if (!selectedProviderId) return;
     setProvider(selectedProviderId, (provider) => ({
       ...provider,
-      models: (provider.models ?? []).filter((model) => model.id !== modelId),
+      models: (provider.models ?? []).filter((_model, index) => index !== modelIndex),
     }));
   };
 
@@ -261,10 +269,8 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
     if (!window.piApp) return;
     setSaving(true);
     try {
-      const nextModelsJson = applyProviderHeaders();
-      setModelsJson(nextModelsJson);
-      const result = await window.piApp.writeModelsJson(nextModelsJson);
-      const patterns = await window.piApp.syncEnabledModels(nextModelsJson);
+      const result = await window.piApp.writeModelsJson(modelsJson);
+      const patterns = await window.piApp.syncEnabledModels(modelsJson);
       onRefreshRuntime?.();
       setStatus({ kind: "ok", text: t("settings.models.saved", { providers: result.providerCount, models: result.modelCount, patterns: patterns.length }) });
     } catch (error) {
@@ -277,8 +283,7 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
   const runProviderAction = async (action: "test" | "fetch" | "probe") => {
     if (!window.piApp || !selectedProvider || !selectedProviderId) return;
     try {
-      const headers = parseHeaders(headersText, t);
-      const providerInput = { ...selectedProvider, headers, baseUrl: selectedProvider.baseUrl ?? "" };
+      const providerInput = { ...selectedProvider, headers: selectedProvider.headers ?? {}, baseUrl: selectedProvider.baseUrl ?? "" };
       if (!providerInput.baseUrl.trim()) {
         setStatus({ kind: "error", text: t("settings.models.baseUrlRequired") });
         return;
@@ -291,7 +296,36 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
       if (action === "fetch" && result.models) {
         mergeFetchedModels(result.models);
       }
+      if (action === "probe" && result.status === "ok" && result.balance) {
+        setProvider(selectedProviderId, (provider) => ({
+          ...provider,
+          usageLastValue: result.balance,
+          usageLastCheckedAt: new Date().toISOString(),
+        }));
+        void persistProviderUsageResult(selectedProviderId, result.balance);
+      }
       setStatus({ kind: result.status === "ok" ? "ok" : "error", text: formatProbeResult(action, result, t) });
+    } catch (error) {
+      setStatus({ kind: "error", text: describeError(error, t) });
+    }
+  };
+
+  const persistProviderUsageResult = async (providerId: string, usageLastValue: string) => {
+    if (!window.piApp) return;
+    const usageLastCheckedAt = new Date().toISOString();
+    const nextModelsJson = {
+      providers: {
+        ...modelsJson.providers,
+        [providerId]: {
+          ...(modelsJson.providers[providerId] ?? {}),
+          usageLastValue,
+          usageLastCheckedAt,
+        },
+      },
+    };
+    try {
+      await window.piApp.writeModelsJson(nextModelsJson);
+      onRefreshRuntime?.();
     } catch (error) {
       setStatus({ kind: "error", text: describeError(error, t) });
     }
@@ -306,37 +340,30 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
     });
   };
 
-  const importCcSwitchFile = async (file: File | undefined) => {
-    if (!file) return;
+  const syncCcSwitch = async () => {
+    if (!window.piApp) return;
+    setSaving(true);
     try {
-      const text = await file.text();
-      const imported = extractProvidersFromImport(JSON.parse(text) as unknown);
-      const importedIds = Object.keys(imported.providers);
-      if (importedIds.length === 0) {
-        setStatus({ kind: "error", text: t("settings.models.noCcSwitchEntries") });
-        return;
-      }
-      setModelsJson((current) => ({ providers: { ...current.providers, ...imported.providers } }));
-      setSelectedProviderId(importedIds[0] ?? selectedProviderId);
-      setStatus({ kind: "ok", text: t("settings.models.importedCcSwitch", { count: importedIds.length, file: file.name }) });
+      const result = await window.piApp.syncCcSwitchProviders();
+      const file = await window.piApp.readModelsJson();
+      const ids = Object.keys(file.providers).sort((a, b) => a.localeCompare(b));
+      setModelsJson(file);
+      setSelectedProviderId((current) => current && file.providers[current] ? current : ids[0] ?? "");
+      onRefreshRuntime?.();
+      setStatus({ kind: "ok", text: t("settings.models.syncedCcSwitch", { providers: result.importedProviderCount, models: result.importedModelCount, patterns: result.syncedPatternCount }) });
     } catch (error) {
       setStatus({ kind: "error", text: describeError(error, t) });
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
     <SettingsGroup title={t("settings.models.advanced")} description={t("settings.models.advancedDescription")}>
       <div className="model-manager__toolbar">
-        <div className="model-manager__add">
-          <input className="settings-text-input" placeholder={t("settings.models.providerId")} value={newProviderId} onChange={(event) => setNewProviderId(event.target.value)} />
-          <button className="button button--secondary" type="button" onClick={addProvider}>{t("settings.models.addProvider")}</button>
-        </div>
-        <div className="settings-row__actions">
-          <button className="button button--secondary" disabled={loading} type="button" onClick={() => window.piApp?.readModelsJson().then((file) => setModelsJson(file)).catch((error) => setStatus({ kind: "error", text: describeError(error, t) }))}>{t("settings.models.reload")}</button>
-          <label className="button button--secondary model-manager__file-button">
-            {t("settings.models.importCcSwitch")}
-            <input accept="application/json,.json" type="file" onChange={(event) => void importCcSwitchFile(event.target.files?.[0])} />
-          </label>
+        <div className="settings-row__actions model-manager__toolbar-actions">
+          <button className="button button--secondary model-manager__strong-button" disabled={loading} type="button" onClick={() => window.piApp?.readModelsJson().then((file) => setModelsJson(file)).catch((error) => setStatus({ kind: "error", text: describeError(error, t) }))}>{t("settings.models.reload")}</button>
+          <button className="button button--secondary model-manager__strong-button" disabled={saving} type="button" onClick={() => void syncCcSwitch()}>{t("settings.models.syncCcSwitch")}</button>
           <button className="button button--primary" disabled={saving} type="button" onClick={() => void save()}>{saving ? t("settings.models.saving") : t("settings.models.saveSync")}</button>
         </div>
       </div>
@@ -348,6 +375,9 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
               <div className="model-manager__section-label">{t("settings.nav.providers")}</div>
               <strong>{providerIds.length}</strong>
             </div>
+            <button className="model-manager__icon-button" type="button" aria-label={t("settings.models.addProvider")} title={t("settings.models.addProvider")} onClick={addProvider}>
+              +
+            </button>
           </div>
           <input
             className="settings-search model-manager__filter"
@@ -361,8 +391,15 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
             const enabled = provider.enabled !== false;
             return (
               <button className={`model-manager__provider${providerId === selectedProviderId ? " model-manager__provider--active" : ""}`} key={providerId} type="button" onClick={() => setSelectedProviderId(providerId)}>
-                <span className="model-manager__provider-name">{providerId}</span>
-                <span className="model-manager__provider-meta">{enabled ? t("settings.models.enabled") : "off"} · {provider.models?.length ?? 0}</span>
+                <span className="model-manager__provider-copy">
+                  <span className="model-manager__provider-name">{providerId}</span>
+                  <span className="model-manager__provider-meta">{provider.models?.length ?? 0}</span>
+                </span>
+                <ToggleSwitch
+                  checked={enabled}
+                  label={t("settings.models.providerEnabled")}
+                  onChange={(checked) => setProvider(providerId, (provider) => ({ ...provider, enabled: checked }))}
+                />
               </button>
             );
           })}
@@ -372,56 +409,69 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
           <div className="model-manager__workspace">
             <section className="model-manager__config" aria-label={t("settings.models.providerId")}>
               <div className="model-manager__panel-head">
-                <div>
+                <div className="model-manager__provider-title">
                   <div className="model-manager__section-label">{t("settings.models.providerId")}</div>
-                  <strong>{selectedProviderId}</strong>
+                  {editingProviderId ? (
+                    <input
+                      autoFocus
+                      className="settings-text-input model-manager__provider-name-input"
+                      value={renameValue}
+                      onBlur={renameProvider}
+                      onChange={(event) => setRenameValue(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.currentTarget.blur();
+                        }
+                        if (event.key === "Escape") {
+                          setRenameValue(selectedProviderId);
+                          setEditingProviderId(false);
+                        }
+                      }}
+                    />
+                  ) : (
+                    <button className="model-manager__provider-title-button" type="button" onDoubleClick={() => setEditingProviderId(true)}>
+                      {selectedProviderId}
+                    </button>
+                  )}
                 </div>
                 <div className="model-manager__toggles">
-                  <label className="settings-toggle"><input checked={selectedProvider.enabled !== false} type="checkbox" onChange={(event) => setProvider(selectedProviderId, (provider) => ({ ...provider, enabled: event.target.checked }))} />{t("settings.models.providerEnabled")}</label>
-                  <label className="settings-toggle"><input checked={selectedProvider.authHeader !== false} type="checkbox" onChange={(event) => setProvider(selectedProviderId, (provider) => ({ ...provider, authHeader: event.target.checked }))} />{t("settings.models.useBearer")}</label>
+                  <button className="button button--secondary model-manager__strong-button" type="button" onClick={() => void runProviderAction("test")}>{t("settings.models.test")}</button>
+                  <button className="button button--secondary model-manager__strong-button" type="button" onClick={deleteProvider}>{t("settings.models.delete")}</button>
                 </div>
               </div>
               <div className="model-manager__compact-grid">
-                <label className="settings-field">{t("settings.models.providerId")}<input className="settings-text-input" value={renameValue} onChange={(event) => setRenameValue(event.target.value)} /></label>
                 <label className="settings-field">{t("settings.models.baseUrl")}<input className="settings-text-input" value={selectedProvider.baseUrl ?? ""} onChange={(event) => setProvider(selectedProviderId, (provider) => ({ ...provider, baseUrl: event.target.value }))} /></label>
                 <label className="settings-field">{t("settings.models.apiType")}<input className="settings-text-input" placeholder={t("settings.models.apiTypePlaceholder")} value={selectedProvider.api ?? ""} onChange={(event) => setProvider(selectedProviderId, (provider) => ({ ...provider, api: event.target.value }))} /></label>
                 <label className="settings-field">{t("settings.models.apiKey")}<input className="settings-text-input" type="password" value={selectedProvider.apiKey ?? ""} onChange={(event) => setProvider(selectedProviderId, (provider) => ({ ...provider, apiKey: event.target.value }))} /></label>
-                <label className="settings-field">{t("settings.models.balanceUrl")}<input className="settings-text-input" value={selectedProvider.balanceBaseUrl ?? ""} onChange={(event) => setProvider(selectedProviderId, (provider) => ({ ...provider, balanceBaseUrl: event.target.value }))} /></label>
-                <label className="settings-field">{t("settings.models.balanceKey")}<input className="settings-text-input" type="password" value={selectedProvider.balanceApiKey ?? ""} onChange={(event) => setProvider(selectedProviderId, (provider) => ({ ...provider, balanceApiKey: event.target.value }))} /></label>
               </div>
-              <label className="settings-field">{t("settings.models.headersJson")}<textarea className="settings-textarea" value={headersText} onChange={(event) => setHeadersText(event.target.value)} /></label>
               <div className="settings-row__actions model-manager__actions">
-                <button className="button button--secondary" type="button" onClick={renameProvider}>{t("settings.models.rename")}</button>
-                <button className="button button--secondary" type="button" onClick={updateProviderHeaders}>{t("settings.models.applyHeaders")}</button>
-                <button className="button button--secondary" type="button" onClick={() => void runProviderAction("test")}>{t("settings.models.testProvider")}</button>
+                <button className="button button--secondary" type="button" onClick={openBalanceDialog}>{t("settings.models.usageSettings")}</button>
                 <button className="button button--secondary" type="button" onClick={() => void runProviderAction("fetch")}>{t("settings.models.fetchModels")}</button>
-                <button className="button button--secondary" type="button" onClick={() => void runProviderAction("probe")}>{t("settings.models.probeBalance")}</button>
-                <button className="button button--secondary" type="button" onClick={deleteProvider}>{t("settings.models.deleteProvider")}</button>
+                <button className="button button--secondary model-manager__usage-button" type="button" title={selectedProvider.usageLastCheckedAt ?? undefined} onClick={() => void runProviderAction("probe")}>
+                  {selectedProvider.usageLastValue ? <span className="model-manager__usage-value">{selectedProvider.usageLastValue}</span> : null}
+                  <span>{t("settings.models.queryUsage")}</span>
+                </button>
               </div>
             </section>
             <section className="model-manager__models-panel" aria-label={t("settings.models.models")}>
               <div className="model-manager__models-head">
-                <div>
+                <div className="model-manager__models-title">
                   <div className="model-manager__section-label">{t("settings.models.models")}</div>
-                  <strong>{filteredSelectedModels.length} / {selectedModels.length}</strong>
-                </div>
-                <div className="model-manager__add">
                   <input className="settings-search model-manager__filter" placeholder={t("settings.models.searchModels")} value={modelQuery} onChange={(event) => setModelQuery(event.target.value)} />
-                  <input className="settings-text-input" placeholder={t("settings.models.modelId")} value={newModelId} onChange={(event) => setNewModelId(event.target.value)} />
-                  <button className="button button--secondary" type="button" onClick={addModel}>{t("settings.models.addModel")}</button>
                 </div>
+                <button className="button button--secondary model-manager__strong-button" type="button" onClick={addModel}>{t("settings.models.addModel")}</button>
               </div>
               <div className="model-manager__models">
-                {filteredSelectedModels.map((model) => (
-                  <div className="model-manager__model" key={model.id}>
+                {filteredSelectedModels.map(({ model, index }) => (
+                  <div className="model-manager__model" key={`${index}:${model.id}`}>
                     <div className="model-manager__model-main">
-                      <label className="settings-toggle"><input checked={model.enabled !== false} type="checkbox" onChange={(event) => updateModel(model.id, (current) => ({ ...current, enabled: event.target.checked }))} />{t("settings.models.enabled")}</label>
-                      <input className="settings-text-input" value={model.id} onChange={(event) => updateModel(model.id, (current) => ({ ...current, id: event.target.value }))} />
+                      <ToggleSwitch checked={model.enabled !== false} label={t("settings.models.enabled")} onChange={(checked) => updateModel(index, (current) => ({ ...current, enabled: checked }))} />
+                      <input className="settings-text-input" placeholder={t("settings.models.modelId")} value={model.id} onChange={(event) => updateModel(index, (current) => ({ ...current, id: event.target.value }))} />
                     </div>
                     <div className="model-manager__model-extra">
-                      <input className="settings-text-input" placeholder={t("settings.models.displayName")} value={model.name ?? ""} onChange={(event) => updateModel(model.id, (current) => ({ ...current, name: event.target.value }))} />
-                      <label className="settings-toggle"><input checked={model.reasoning === true} type="checkbox" onChange={(event) => updateModel(model.id, (current) => ({ ...current, reasoning: event.target.checked }))} />{t("settings.models.reasoning")}</label>
-                      <button className="button button--secondary" type="button" onClick={() => deleteModel(model.id)}>{t("settings.models.delete")}</button>
+                      <input className="settings-text-input" placeholder={t("settings.models.displayName")} value={model.name ?? ""} onChange={(event) => updateModel(index, (current) => ({ ...current, name: event.target.value }))} />
+                      <label className="settings-toggle"><input checked={model.reasoning === true} type="checkbox" onChange={(event) => updateModel(index, (current) => ({ ...current, reasoning: event.target.checked }))} />{t("settings.models.reasoning")}</label>
+                      <button className="button button--secondary" type="button" onClick={() => deleteModel(index)}>{t("settings.models.delete")}</button>
                     </div>
                   </div>
                 ))}
@@ -432,6 +482,28 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
           </div>
         ) : <div className="model-manager__empty settings-hint">{t("settings.models.selectProvider")}</div>}
       </div>
+      {balanceDialogOpen ? (
+        <div className="model-manager-dialog" role="dialog" aria-modal="true" aria-label={t("settings.models.balanceSettings")}>
+          <div className="model-manager-dialog__backdrop" onClick={() => setBalanceDialogOpen(false)} />
+          <div className="model-manager-dialog__panel">
+            <div className="model-manager-dialog__head">
+              <div>
+                <div className="model-manager__section-label">{selectedProviderId}</div>
+                <strong>{t("settings.models.balanceSettings")}</strong>
+              </div>
+              <button className="model-manager__icon-button" type="button" aria-label={t("common.close")} onClick={() => setBalanceDialogOpen(false)}>×</button>
+            </div>
+            <div className="model-manager-dialog__body">
+              <label className="settings-field">{t("settings.models.balanceUrl")}<input className="settings-text-input" value={balanceBaseUrlDraft} onChange={(event) => setBalanceBaseUrlDraft(event.target.value)} /></label>
+              <label className="settings-field">{t("settings.models.balanceKey")}<input className="settings-text-input" type="password" value={balanceApiKeyDraft} onChange={(event) => setBalanceApiKeyDraft(event.target.value)} /></label>
+            </div>
+            <div className="model-manager-dialog__actions">
+              <button className="button button--secondary" type="button" onClick={() => setBalanceDialogOpen(false)}>{t("common.cancel")}</button>
+              <button className="button button--primary" type="button" onClick={applyBalanceSettings}>{t("common.save")}</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </SettingsGroup>
   );
 }
@@ -439,64 +511,6 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
 interface StatusMessage {
   readonly kind: "ok" | "error";
   readonly text: string;
-}
-
-function parseHeaders(input: string, t?: I18nContextValue["t"]): Record<string, string> {
-  const trimmed = input.trim();
-  if (!trimmed) return {};
-  const parsed = JSON.parse(trimmed) as unknown;
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error(t ? t("settings.models.headersObject") : "Headers must be a JSON object.");
-  }
-  return normalizeStringRecord(parsed, t);
-}
-
-function extractProvidersFromImport(input: unknown): ModelsJsonFile {
-  if (!input || typeof input !== "object") return { providers: {} };
-  const record = input as Record<string, unknown>;
-  const root = record.providers && typeof record.providers === "object" ? record.providers as Record<string, unknown> : record;
-  const providers: Record<string, ModelsJsonProviderConfig> = {};
-  for (const [providerId, value] of Object.entries(root)) {
-    if (!value || typeof value !== "object") continue;
-    const provider = value as Record<string, unknown>;
-    const baseUrl = firstString(provider.baseUrl, provider.base_url, provider.url, provider.endpoint);
-    const models = extractImportedModels(provider.models ?? provider.modelList ?? provider.availableModels);
-    if (!baseUrl && models.length === 0) continue;
-    providers[providerId] = {
-      ...(baseUrl ? { baseUrl } : {}),
-      ...(firstString(provider.api, provider.type) ? { api: firstString(provider.api, provider.type) } : {}),
-      ...(firstString(provider.apiKey, provider.api_key, provider.key) ? { apiKey: firstString(provider.apiKey, provider.api_key, provider.key) } : {}),
-      ...(provider.headers && typeof provider.headers === "object" ? { headers: normalizeStringRecord(provider.headers) } : {}),
-      enabled: provider.enabled === false ? false : true,
-      models,
-    };
-  }
-  return { providers };
-}
-
-function extractImportedModels(input: unknown): ModelsJsonModelConfig[] {
-  const values = Array.isArray(input) ? input : input && typeof input === "object" ? Object.values(input as Record<string, unknown>) : [];
-  return values.flatMap((value): ModelsJsonModelConfig[] => {
-    if (typeof value === "string") return [{ id: value, enabled: true }];
-    if (!value || typeof value !== "object") return [];
-    const record = value as Record<string, unknown>;
-    const id = firstString(record.id, record.name, record.model);
-    if (!id) return [];
-    return [{ id, name: firstString(record.displayName, record.label), enabled: record.enabled === false ? false : true }];
-  });
-}
-
-function firstString(...values: readonly unknown[]): string | undefined {
-  return values.find((value): value is string => typeof value === "string" && value.trim().length > 0)?.trim();
-}
-
-function normalizeStringRecord(value: unknown, t?: I18nContextValue["t"]): Record<string, string> {
-  const headers: Record<string, string> = {};
-  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
-    if (typeof raw !== "string") throw new Error(t ? t("settings.models.headerString", { key }) : `Header '${key}' must be a string.`);
-    headers[key] = raw;
-  }
-  return headers;
 }
 
 function formatProbeResult(action: string, result: ProviderProbeResult, t: I18nContextValue["t"]): string {

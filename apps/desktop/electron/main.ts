@@ -29,6 +29,7 @@ import {
   fetchProviderModels,
   probeProvider,
   readModelsJson,
+  syncCcSwitchProviders,
   syncEnabledModelsToSettings,
   testProvider,
   writeModelsJson,
@@ -597,6 +598,7 @@ app.whenReady().then(async () => {
   ipcMain.handle(desktopIpc.testProvider, async (_event, provider) => testProvider(provider));
   ipcMain.handle(desktopIpc.probeProvider, async (_event, provider) => probeProvider(provider));
   ipcMain.handle(desktopIpc.syncEnabledModels, async (_event, modelsJson) => syncEnabledModelsToSettings(modelsJson));
+  ipcMain.handle(desktopIpc.syncCcSwitchProviders, async () => syncCcSwitchProviders());
   ipcMain.handle(desktopIpc.terminalEnsurePanel, (event, workspaceId: string, terminalScopeId: string, size) => {
     return getTerminalService().ensurePanel(event.sender, workspaceId, terminalScopeId, size);
   });

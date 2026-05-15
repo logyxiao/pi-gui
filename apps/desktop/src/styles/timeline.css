@@ -327,11 +327,15 @@
 }
 
 .timeline-item--assistant {
-  max-width: 760px;
+  width: min(920px, 100%);
+  max-width: 100%;
+  margin: 0 auto;
 }
 
 .timeline-item--summary-card {
-  max-width: 760px;
+  width: min(920px, 100%);
+  max-width: 100%;
+  margin: 0 auto;
   padding: 14px 16px;
   border-radius: 18px;
   border: 1px solid rgba(210, 177, 98, 0.36);
@@ -350,6 +354,9 @@
 .timeline-item--user {
   display: flex;
   justify-content: flex-end;
+  width: min(920px, 100%);
+  max-width: 100%;
+  margin: 0 auto;
 }
 
 .timeline-item__bubble {
@@ -415,6 +422,9 @@
 }
 
 .timeline-activity {
+  width: min(920px, 100%);
+  max-width: 100%;
+  margin: 0 auto;
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -441,7 +451,9 @@
 }
 
 .timeline-tool {
-  max-width: 760px;
+  width: min(920px, 100%);
+  max-width: 100%;
+  margin: 0 auto;
   display: grid;
   gap: 2px;
   padding: 0;

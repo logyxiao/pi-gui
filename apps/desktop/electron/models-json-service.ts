@@ -1,6 +1,11 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
+import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
 
 export interface ModelsJsonModelConfig {
   readonly id: string;
@@ -21,6 +26,9 @@ export interface ModelsJsonProviderConfig {
   readonly headers?: Record<string, string>;
   readonly balanceBaseUrl?: string;
   readonly balanceApiKey?: string;
+  readonly usageScript?: string;
+  readonly usageLastValue?: string;
+  readonly usageLastCheckedAt?: string;
   readonly enabled?: boolean;
   readonly models?: readonly ModelsJsonModelConfig[];
 }
@@ -53,6 +61,13 @@ export interface ModelsJsonSaveResult {
   readonly providerCount: number;
   readonly modelCount: number;
   readonly enabledCount: number;
+}
+
+export interface CcSwitchSyncResult extends ModelsJsonSaveResult {
+  readonly sourcePath: string;
+  readonly importedProviderCount: number;
+  readonly importedModelCount: number;
+  readonly syncedPatternCount: number;
 }
 
 export function getModelsJsonPath(): string {
@@ -109,6 +124,9 @@ export function normalizeModelsJson(input: unknown): ModelsJsonFile {
       ...(provider.headers && typeof provider.headers === "object" ? { headers: normalizeStringRecord(provider.headers) } : {}),
       ...(typeof provider.balanceBaseUrl === "string" ? { balanceBaseUrl: provider.balanceBaseUrl } : {}),
       ...(typeof provider.balanceApiKey === "string" ? { balanceApiKey: provider.balanceApiKey } : {}),
+      ...(typeof provider.usageScript === "string" ? { usageScript: provider.usageScript } : {}),
+      ...(typeof provider.usageLastValue === "string" ? { usageLastValue: provider.usageLastValue } : {}),
+      ...(typeof provider.usageLastCheckedAt === "string" ? { usageLastCheckedAt: provider.usageLastCheckedAt } : {}),
       ...(typeof provider.enabled === "boolean" ? { enabled: provider.enabled } : {}),
       ...(models && models.length > 0 ? { models } : {}),
     };
@@ -147,6 +165,31 @@ export async function syncEnabledModelsToSettings(modelsJson: ModelsJsonFile): P
   return patterns;
 }
 
+export async function syncCcSwitchProviders(): Promise<CcSwitchSyncResult> {
+  const candidates = getCcSwitchDatabaseCandidates();
+  const found = candidates.find((candidate) => existsSync(candidate));
+  if (!found) {
+    throw new Error(`cc-switch database not found. Checked: ${candidates.join(", ")}`);
+  }
+  const extracted = await extractCcSwitchProviders(found);
+  const importedProviderCount = Object.keys(extracted.providers).length;
+  const importedModelCount = Object.values(extracted.providers).reduce((count, provider) => count + (provider.models?.length ?? 0), 0);
+  if (importedProviderCount === 0) {
+    throw new Error(`No cc-switch provider records found in ${found}`);
+  }
+  const current = await readModelsJson();
+  const merged = mergeModelsJson(current, extracted);
+  const saveResult = await writeModelsJson(merged);
+  const patterns = await syncEnabledModelsToSettings(merged);
+  return {
+    ...saveResult,
+    sourcePath: found,
+    importedProviderCount,
+    importedModelCount,
+    syncedPatternCount: patterns.length,
+  };
+}
+
 export async function fetchProviderModels(input: ProviderEndpointProbeInput): Promise<ProviderProbeResult> {
   const startedAt = Date.now();
   const { urls, url } = buildCandidateUrls(input.baseUrl);
@@ -182,36 +225,107 @@ export async function testProvider(input: ProviderEndpointProbeInput): Promise<P
   return fetchProviderModels(input);
 }
 
-export async function probeProvider(input: ProviderEndpointProbeInput & { readonly balanceBaseUrl?: string; readonly balanceApiKey?: string }): Promise<ProviderProbeResult> {
+export async function probeProvider(input: ProviderEndpointProbeInput & { readonly balanceBaseUrl?: string; readonly balanceApiKey?: string; readonly usageScript?: string }): Promise<ProviderProbeResult> {
   const modelProbe = await fetchProviderModels(input);
   if (modelProbe.status !== "ok") {
     return modelProbe;
   }
-  const balanceSource = input.balanceBaseUrl || input.baseUrl;
-  const balanceCandidates = [
-    joinUrl(balanceSource, "/balance"),
-    joinUrl(balanceSource, "/v1/balance"),
-    joinUrl(balanceSource, "/dashboard/billing/credit_grants"),
-  ];
-  for (const candidate of balanceCandidates) {
-    try {
-      const response = await fetch(candidate, { headers: buildHeaders({ ...input, baseUrl: input.balanceBaseUrl ?? input.baseUrl, apiKey: input.balanceApiKey ?? input.apiKey }) });
-      if (!response.ok) continue;
-      const text = await response.text();
-      return {
-        ...modelProbe,
-        balance: summarizeBalance(text),
-        balanceSource: candidate,
-        detail: `${modelProbe.detail}; balance probe responded`,
-      };
-    } catch {
-      continue;
-    }
+  const usageProbe = await runUsageProbe(input);
+  if (usageProbe) {
+    return {
+      ...modelProbe,
+      balance: usageProbe.value,
+      balanceSource: usageProbe.url,
+      detail: `${modelProbe.detail}; usage query responded`,
+    };
   }
   return {
     ...modelProbe,
-    detail: `${modelProbe.detail}; no balance endpoint detected`,
+    detail: `${modelProbe.detail}; no usage query configured`,
   };
+}
+
+async function runUsageProbe(input: ProviderEndpointProbeInput & { readonly balanceBaseUrl?: string; readonly balanceApiKey?: string; readonly usageScript?: string }): Promise<{ readonly value: string; readonly url: string } | undefined> {
+  const scriptConfig = parseUsageScript(input.usageScript);
+  const explicitBalanceUrl = input.balanceBaseUrl?.trim();
+  const url = scriptConfig?.request.url ?? explicitBalanceUrl;
+  if (!url) return undefined;
+  const apiKey = input.balanceApiKey ?? input.apiKey ?? "";
+  const renderedUrl = interpolateUsageTemplate(url, input.baseUrl, apiKey);
+  const headers = {
+    ...buildHeaders({ ...input, apiKey }),
+    ...(scriptConfig?.request.headers ? renderUsageHeaders(scriptConfig.request.headers, input.baseUrl, apiKey) : {}),
+  };
+  const response = await fetch(renderedUrl, {
+    method: scriptConfig?.request.method ?? "GET",
+    headers,
+    ...(scriptConfig?.request.body ? { body: interpolateUsageTemplate(scriptConfig.request.body, input.baseUrl, apiKey) } : {}),
+  });
+  if (!response.ok) return undefined;
+  const text = await response.text();
+  const parsed = tryParseJson(text) ?? text;
+  const extracted = scriptConfig?.extractor ? runUsageExtractor(scriptConfig.extractor, parsed) : undefined;
+  return { value: summarizeUsageResult(extracted ?? parsed), url: renderedUrl };
+}
+
+interface ParsedUsageScript {
+  readonly request: {
+    readonly url: string;
+    readonly method?: string;
+    readonly headers?: Record<string, string>;
+    readonly body?: string;
+  };
+  readonly extractor?: string;
+}
+
+function parseUsageScript(script: string | undefined): ParsedUsageScript | undefined {
+  if (!script?.trim()) return undefined;
+  const url = /url\s*:\s*["'`]([^"'`]+)["'`]/.exec(script)?.[1];
+  if (!url) return undefined;
+  const method = /method\s*:\s*["'`]([^"'`]+)["'`]/.exec(script)?.[1];
+  const body = /body\s*:\s*["'`]([^"'`]+)["'`]/.exec(script)?.[1];
+  const headersBlock = /headers\s*:\s*\{([\s\S]*?)\}/.exec(script)?.[1];
+  const headers: Record<string, string> = {};
+  if (headersBlock) {
+    for (const match of headersBlock.matchAll(/["'`]([^"'`]+)["'`]\s*:\s*["'`]([^"'`]+)["'`]/g)) {
+      headers[match[1] ?? ""] = match[2] ?? "";
+    }
+  }
+  const extractorMatch = /extractor\s*:\s*(function\s*\([^)]*\)\s*\{[\s\S]*?\n\s*\})\s*[,}]\s*/.exec(script);
+  return { request: { url, ...(method ? { method } : {}), ...(Object.keys(headers).length > 0 ? { headers } : {}), ...(body ? { body } : {}) }, ...(extractorMatch?.[1] ? { extractor: extractorMatch[1] } : {}) };
+}
+
+function renderUsageHeaders(headers: Record<string, string>, baseUrl: string, apiKey: string): Record<string, string> {
+  return Object.fromEntries(Object.entries(headers).map(([key, value]) => [key, interpolateUsageTemplate(value, baseUrl, apiKey)]));
+}
+
+function interpolateUsageTemplate(template: string, baseUrl: string, apiKey: string): string {
+  return template.replaceAll("{{baseUrl}}", baseUrl.replace(/\/+$/, "")).replaceAll("{{apiKey}}", apiKey);
+}
+
+function runUsageExtractor(extractor: string, response: unknown): unknown {
+  try {
+    const fn = new Function("response", `return (${extractor})(response);`) as (response: unknown) => unknown;
+    return fn(response);
+  } catch {
+    return undefined;
+  }
+}
+
+function summarizeUsageResult(result: unknown): string {
+  if (result && typeof result === "object") {
+    const record = result as Record<string, unknown>;
+    const remaining = firstNumericLikeValue(record, ["remaining", "remain", "available", "available_balance", "availableBalance"])
+      ?? firstNestedNumericLikeValue(record, ["quota", "credits", "balance"], ["remaining", "remain", "available"]);
+    const unit = firstStringValue(record, ["unit", "currency"]) ?? firstNestedStringValue(record, ["quota", "balance"], ["unit", "currency"]);
+    if (remaining !== undefined) return formatBalanceValue(remaining, unit);
+    const balance = firstNumericLikeValue(record, ["balance", "credit", "credits", "amount"]);
+    if (balance !== undefined) return formatBalanceValue(balance, unit);
+    return summarizeBalanceObject(record) ?? JSON.stringify(record).slice(0, 120);
+  }
+  if (typeof result === "string") return result.trim().slice(0, 120) || "ok";
+  if (typeof result === "number" || typeof result === "boolean") return String(result);
+  return "ok";
 }
 
 function buildCandidateUrls(baseUrl: string): { readonly urls: string[]; readonly url: string } {
@@ -253,6 +367,290 @@ function extractModelId(item: unknown): string | undefined {
   if (typeof record.model === "string") return record.model;
   if (typeof record.name === "string") return record.name;
   return undefined;
+}
+
+function getCcSwitchDatabaseCandidates(): string[] {
+  const localAppData = process.env.LOCALAPPDATA;
+  const appData = process.env.APPDATA;
+  const candidates = [
+    process.env.CC_SWITCH_DB_PATH,
+    localAppData ? join(localAppData, "com.ccswitch.desktop", "cc-switch.db") : undefined,
+    localAppData ? join(localAppData, "com.ccswitch.desktop", "ccswitch.db") : undefined,
+    localAppData ? join(localAppData, "com.ccswitch.desktop", "database.sqlite") : undefined,
+    localAppData ? join(localAppData, "com.ccswitch.desktop", "app.db") : undefined,
+    appData ? join(appData, "cc-switch", "cc-switch.db") : undefined,
+    appData ? join(appData, "ccswitch", "ccswitch.db") : undefined,
+    join(homedir(), ".cc-switch", "cc-switch.db"),
+    join(homedir(), ".ccswitch", "ccswitch.db"),
+  ];
+  return candidates.filter((candidate): candidate is string => Boolean(candidate));
+}
+
+async function extractCcSwitchProviders(databasePath: string): Promise<ModelsJsonFile> {
+  const rows = await queryCcSwitchProviderRows(databasePath);
+  const providers: Record<string, ModelsJsonProviderConfig> = {};
+  for (const row of rows) {
+    const provider = providerFromCcSwitchRow(row);
+    if (!provider) continue;
+    providers[provider.id] = mergeProvider(providers[provider.id], provider.config);
+  }
+  return { providers };
+}
+
+async function queryCcSwitchProviderRows(databasePath: string): Promise<unknown[]> {
+  const tempDir = await mkdtemp(join(tmpdir(), "pi-ccswitch-"));
+  const scriptPath = join(tempDir, "extract-providers.py");
+  const outputPath = join(tempDir, "providers.json");
+  const script = `
+import json, sqlite3, sys
+path, out = sys.argv[1], sys.argv[2]
+conn = sqlite3.connect(path)
+conn.row_factory = sqlite3.Row
+exists = conn.execute("select 1 from sqlite_master where type='table' and name='providers'").fetchone()
+rows = []
+if exists:
+    for row in conn.execute("select * from providers").fetchall():
+        rows.append({key: row[key] for key in row.keys()})
+with open(out, 'w', encoding='utf-8') as f:
+    json.dump(rows, f, ensure_ascii=False)
+`;
+  await writeFile(scriptPath, script, "utf8");
+  try {
+    await execFileAsync(resolvePythonCommand(), [scriptPath, databasePath, outputPath], { timeout: 15_000, maxBuffer: 1024 * 1024 * 20 });
+    return JSON.parse(await readFile(outputPath, "utf8")) as unknown[];
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+}
+
+async function querySqliteJsonRows(databasePath: string): Promise<unknown[]> {
+  const tempDir = await mkdtemp(join(tmpdir(), "pi-ccswitch-"));
+  const scriptPath = join(tempDir, "extract.py");
+  const outputPath = join(tempDir, "rows.json");
+  const script = `
+import json, sqlite3, sys
+path, out = sys.argv[1], sys.argv[2]
+conn = sqlite3.connect(path)
+conn.row_factory = sqlite3.Row
+rows = []
+for table in conn.execute("select name from sqlite_master where type='table'").fetchall():
+    name = table[0]
+    if name.startswith('sqlite_'):
+        continue
+    columns = [c[1] for c in conn.execute('pragma table_info("%s")' % name.replace('"', '""')).fetchall()]
+    if not columns:
+        continue
+    try:
+        for row in conn.execute('select * from "%s"' % name.replace('"', '""')).fetchall():
+            item = {column: row[column] for column in columns}
+            item['__table'] = name
+            rows.append(item)
+    except Exception:
+        pass
+with open(out, 'w', encoding='utf-8') as f:
+    json.dump(rows, f, ensure_ascii=False)
+`;
+  await writeFile(scriptPath, script, "utf8");
+  try {
+    await execFileAsync(resolvePythonCommand(), [scriptPath, databasePath, outputPath], { timeout: 15_000, maxBuffer: 1024 * 1024 * 20 });
+    return JSON.parse(await readFile(outputPath, "utf8")) as unknown[];
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+}
+
+function resolvePythonCommand(): string {
+  return process.platform === "win32" ? "python" : "python3";
+}
+
+function providerFromCcSwitchRow(input: unknown): { readonly id: string; readonly config: ModelsJsonProviderConfig } | undefined {
+  if (!input || typeof input !== "object") return undefined;
+  const row = input as Record<string, unknown>;
+  const settings = tryParseJson(typeof row.settings_config === "string" ? row.settings_config : "") as Record<string, unknown> | undefined;
+  if (!settings || typeof settings !== "object") return undefined;
+  const meta = tryParseJson(typeof row.meta === "string" ? row.meta : "") as Record<string, unknown> | undefined;
+  const appType = typeof row.app_type === "string" ? row.app_type : undefined;
+  const category = typeof row.category === "string" ? row.category : undefined;
+  const rawId = typeof row.id === "string" ? row.id : "cc-switch";
+  const providerName = typeof row.name === "string" && row.name.trim() ? row.name.trim() : rawId;
+  const env = settings.env && typeof settings.env === "object" ? settings.env as Record<string, unknown> : {};
+  const options = settings.options && typeof settings.options === "object" ? settings.options as Record<string, unknown> : {};
+  const auth = settings.auth && typeof settings.auth === "object" ? settings.auth as Record<string, unknown> : {};
+  const configText = typeof settings.config === "string" ? settings.config : "";
+  const baseUrl = firstStringValue(options, ["baseURL", "baseUrl", "base_url"])
+    ?? firstStringValue(env, ["ANTHROPIC_BASE_URL", "OPENAI_BASE_URL", "BASE_URL"])
+    ?? extractTomlString(configText, "base_url");
+  const apiKey = firstStringValue(options, ["apiKey", "api_key"])
+    ?? firstStringValue(auth, ["OPENAI_API_KEY", "apiKey", "api_key"])
+    ?? firstStringValue(env, ["ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"]);
+  const models = extractCcSwitchModelsFromSettings(settings, env, configText);
+  const isUsableCustomProvider = Boolean(baseUrl && (apiKey || models.length > 0));
+  if (!isUsableCustomProvider) return undefined;
+  if (category === "official" && !apiKey && models.length === 0) return undefined;
+  if (!baseUrl) return undefined;
+  const headers = extractCcSwitchHeaders(settings);
+  const usageScript = meta?.usage_script && typeof meta.usage_script === "object" ? meta.usage_script as Record<string, unknown> : undefined;
+  const usageScriptCode = typeof usageScript?.code === "string" ? usageScript.code : undefined;
+  const balanceBaseUrl = buildCcSwitchBalanceUrl(usageScript, baseUrl);
+  const balanceApiKey = firstStringValue(usageScript ?? {}, ["apiKey", "api_key"]) ?? apiKey;
+  const id = sanitizeProviderId(`ccswitch-${appType ?? "provider"}-${providerName}`);
+  return {
+    id,
+    config: {
+      baseUrl,
+      api: inferCcSwitchApiType(appType, meta, configText),
+      ...(apiKey ? { apiKey } : {}),
+      ...(Object.keys(headers).length > 0 ? { headers } : {}),
+      ...(balanceBaseUrl ? { balanceBaseUrl } : {}),
+      ...(balanceApiKey && balanceBaseUrl ? { balanceApiKey } : {}),
+      ...(usageScriptCode ? { usageScript: usageScriptCode } : {}),
+      enabled: true,
+      models,
+    },
+  };
+}
+
+function flattenRecords(input: unknown): Record<string, unknown> {
+  const output: Record<string, unknown> = {};
+  const visit = (value: unknown, prefix = "") => {
+    if (typeof value === "string") {
+      const parsed = tryParseJson(value);
+      if (parsed !== undefined) {
+        visit(parsed, prefix);
+        return;
+      }
+    }
+    if (!value || typeof value !== "object") return;
+    for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+      const path = prefix ? `${prefix}.${key}` : key;
+      output[path] = raw;
+      output[key] ??= raw;
+      if (raw && typeof raw === "object") visit(raw, path);
+      else if (typeof raw === "string") {
+        const parsed = tryParseJson(raw);
+        if (parsed !== undefined) visit(parsed, path);
+      }
+    }
+  };
+  visit(input);
+  return output;
+}
+
+function extractCcSwitchModelsFromSettings(settings: Record<string, unknown>, env: Record<string, unknown>, configText: string): ModelsJsonModelConfig[] {
+  const models: ModelsJsonModelConfig[] = [];
+  const add = (id: string | undefined, name?: string) => {
+    const trimmed = id?.trim();
+    if (!trimmed || models.some((model) => model.id === trimmed)) return;
+    models.push({ id: trimmed, ...(name ? { name } : {}), enabled: true });
+  };
+  const rawModels = settings.models;
+  if (rawModels && typeof rawModels === "object") {
+    for (const [modelId, rawModel] of Object.entries(rawModels as Record<string, unknown>)) {
+      const name = rawModel && typeof rawModel === "object" && typeof (rawModel as Record<string, unknown>).name === "string"
+        ? (rawModel as Record<string, unknown>).name as string
+        : undefined;
+      add(modelId, name);
+    }
+  }
+  add(firstStringValue(env, ["ANTHROPIC_MODEL", "ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL", "ANTHROPIC_DEFAULT_OPUS_MODEL"]));
+  add(extractTomlString(configText, "model"));
+  return models;
+}
+
+function firstStringValue(record: Record<string, unknown>, keys: readonly string[]): string | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+function firstValueByKeyFragment(record: Record<string, unknown>, fragments: readonly string[]): unknown {
+  const normalized = fragments.map((fragment) => fragment.toLowerCase());
+  for (const [key, value] of Object.entries(record)) {
+    const lower = key.toLowerCase();
+    if (normalized.some((fragment) => lower.endsWith(fragment.toLowerCase()) || lower.includes(fragment.toLowerCase()))) return value;
+  }
+  return undefined;
+}
+
+function extractHeaders(record: Record<string, unknown>): Record<string, string> {
+  const headers = firstValueByKeyFragment(record, ["headers", "header"]);
+  return headers && typeof headers === "object" && !Array.isArray(headers) ? normalizeStringRecord(headers) : {};
+}
+
+function extractCcSwitchHeaders(settings: Record<string, unknown>): Record<string, string> {
+  const headers = settings.headers ?? (settings.options && typeof settings.options === "object" ? (settings.options as Record<string, unknown>).headers : undefined);
+  return headers && typeof headers === "object" && !Array.isArray(headers) ? normalizeStringRecord(headers) : {};
+}
+
+function buildCcSwitchBalanceUrl(usageScript: Record<string, unknown> | undefined, baseUrl: string): string | undefined {
+  if (!usageScript || usageScript.enabled === false) return undefined;
+  const direct = firstStringValue(usageScript, ["url", "balanceUrl", "balance_url"]);
+  if (direct) return interpolateCcSwitchTemplate(direct, usageScript, baseUrl);
+  const code = typeof usageScript.code === "string" ? usageScript.code : "";
+  const match = /url\s*:\s*["'`]([^"'`]+)["'`]/.exec(code);
+  return match?.[1] ? interpolateCcSwitchTemplate(match[1], usageScript, baseUrl) : undefined;
+}
+
+function interpolateCcSwitchTemplate(template: string, usageScript: Record<string, unknown>, baseUrl: string): string {
+  const scriptBaseUrl = firstStringValue(usageScript, ["baseUrl", "base_url"]) ?? baseUrl;
+  return template
+    .replaceAll("{{baseUrl}}", scriptBaseUrl.replace(/\/+$/, ""))
+    .replaceAll("{{apiKey}}", firstStringValue(usageScript, ["apiKey", "api_key"]) ?? "");
+}
+
+function extractTomlString(configText: string, key: string): string | undefined {
+  if (!configText) return undefined;
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = new RegExp(`(?:^|\\n)\\s*${escaped}\\s*=\\s*[\"']([^\"']+)[\"']`).exec(configText);
+  return match?.[1]?.trim();
+}
+
+function inferCcSwitchApiType(appType: string | undefined, meta: Record<string, unknown> | undefined, configText: string): string {
+  const apiFormat = typeof meta?.apiFormat === "string" ? meta.apiFormat : undefined;
+  if (apiFormat) return apiFormat;
+  const wireApi = extractTomlString(configText, "wire_api");
+  if (wireApi === "responses") return "openai-responses";
+  if (appType === "claude") return "anthropic";
+  if (appType === "gemini") return "gemini";
+  return "openai";
+}
+
+function sanitizeProviderId(value: string): string {
+  return value.trim().replace(/[^a-zA-Z0-9_.-]+/g, "-").replace(/^-+|-+$/g, "") || "cc-switch";
+}
+
+function tryParseJson(value: string): unknown | undefined {
+  const trimmed = value.trim();
+  if (!trimmed || !["{", "["].includes(trimmed[0] ?? "")) return undefined;
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return undefined;
+  }
+}
+
+function mergeModelsJson(current: ModelsJsonFile, incoming: ModelsJsonFile): ModelsJsonFile {
+  const providers: Record<string, ModelsJsonProviderConfig> = Object.fromEntries(
+    Object.entries(current.providers).filter(([providerId]) => !providerId.startsWith("ccswitch-")),
+  );
+  for (const [providerId, provider] of Object.entries(incoming.providers)) {
+    providers[providerId] = mergeProvider(providers[providerId], provider);
+  }
+  return { providers };
+}
+
+function mergeProvider(existing: ModelsJsonProviderConfig | undefined, incoming: ModelsJsonProviderConfig): ModelsJsonProviderConfig {
+  const modelMap = new Map<string, ModelsJsonModelConfig>();
+  for (const model of existing?.models ?? []) modelMap.set(model.id, model);
+  for (const model of incoming.models ?? []) modelMap.set(model.id, { ...modelMap.get(model.id), ...model });
+  return {
+    ...existing,
+    ...incoming,
+    headers: { ...(existing?.headers ?? {}), ...(incoming.headers ?? {}) },
+    models: Array.from(modelMap.values()).filter((model) => model.id),
+  };
 }
 
 function normalizeModelConfig(value: unknown): ModelsJsonModelConfig[] {
@@ -333,7 +731,77 @@ function describeError(error: unknown): string | undefined {
 function summarizeBalance(text: string): string {
   const trimmed = text.trim();
   if (!trimmed) return "ok";
+  const parsed = tryParseJson(trimmed);
+  if (parsed && typeof parsed === "object") {
+    const summary = summarizeBalanceObject(parsed as Record<string, unknown>);
+    if (summary) return summary;
+  }
   return trimmed.slice(0, 120);
+}
+
+function summarizeBalanceObject(value: Record<string, unknown>): string | undefined {
+  const validity = typeof value.isValid === "boolean" ? (value.isValid ? "valid" : "invalid") : undefined;
+  const mode = firstStringValue(value, ["mode", "plan", "tier", "status"]);
+  if (mode && ["unrestricted", "unlimited"].includes(mode.toLowerCase())) {
+    return [validity, mode].filter(Boolean).join(" · ");
+  }
+  const remaining = firstNumericLikeValue(value, ["remaining", "remain", "available", "available_balance", "availableBalance"])
+    ?? firstNestedNumericLikeValue(value, ["quota", "credits", "balance"], ["remaining", "remain", "available"]);
+  const balance = firstNumericLikeValue(value, ["balance", "credit", "credits", "amount"]);
+  const used = firstNumericLikeValue(value, ["used", "usage", "spent"])
+    ?? firstNestedNumericLikeValue(value, ["quota"], ["used", "usage", "spent"]);
+  const total = firstNumericLikeValue(value, ["total", "limit", "quota"])
+    ?? firstNestedNumericLikeValue(value, ["quota"], ["total", "limit"]);
+  const unit = firstStringValue(value, ["unit", "currency"]) ?? firstNestedStringValue(value, ["quota", "balance"], ["unit", "currency"]);
+  const parts = [
+    validity,
+    remaining !== undefined ? `remaining ${formatBalanceValue(remaining, unit)}` : undefined,
+    balance !== undefined ? `balance ${formatBalanceValue(balance, unit)}` : undefined,
+    used !== undefined ? `used ${formatBalanceValue(used, unit)}` : undefined,
+    total !== undefined ? `total ${formatBalanceValue(total, unit)}` : undefined,
+    mode,
+  ].filter((part): part is string => Boolean(part));
+  if (parts.length > 0) return [...new Set(parts)].join(" · ");
+  const modelStats = Array.isArray(value.model_stats) ? value.model_stats : Array.isArray(value.modelStats) ? value.modelStats : undefined;
+  if (modelStats) return [validity, mode, `${modelStats.length} model usage records`].filter(Boolean).join(" · ");
+  return undefined;
+}
+
+function firstNumericLikeValue(record: Record<string, unknown>, keys: readonly string[]): string | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+function firstNestedNumericLikeValue(record: Record<string, unknown>, parents: readonly string[], keys: readonly string[]): string | undefined {
+  for (const parent of parents) {
+    const value = record[parent];
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      const found = firstNumericLikeValue(value as Record<string, unknown>, keys);
+      if (found !== undefined) return found;
+    }
+  }
+  return undefined;
+}
+
+function firstNestedStringValue(record: Record<string, unknown>, parents: readonly string[], keys: readonly string[]): string | undefined {
+  for (const parent of parents) {
+    const value = record[parent];
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      const found = firstStringValue(value as Record<string, unknown>, keys);
+      if (found) return found;
+    }
+  }
+  return undefined;
+}
+
+function formatBalanceValue(value: string, unit: string | undefined): string {
+  const numeric = Number(value.replace(/,/g, ""));
+  const displayValue = Number.isFinite(numeric) ? numeric.toFixed(1) : value;
+  return unit ? `${displayValue} ${unit}` : displayValue;
 }
 
 function isMissingFileError(error: unknown): boolean {

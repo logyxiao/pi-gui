@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { RuntimeSkillRecord, RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
 import type { WorkspaceRecord } from "./desktop-state";
 import { RefreshIcon } from "./icons";
+import { useI18n } from "./i18n";
 import { titleCase } from "./string-utils";
 
 interface SkillsViewProps {
@@ -23,6 +24,7 @@ export function SkillsView({
   onTrySkill,
   embedded = false,
 }: SkillsViewProps) {
+  const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [selectedSkillPath, setSelectedSkillPath] = useState<string | undefined>();
   const skills = runtime?.skills ?? [];
@@ -45,165 +47,142 @@ export function SkillsView({
     return (
       <section className="canvas canvas--empty">
         <div className="empty-panel">
-          <div className="session-header__eyebrow">Skills</div>
-          <h1>Select a workspace</h1>
-          <p>Skills are discovered from the selected workspace plus your user-level skill directories.</p>
+          <div className="session-header__eyebrow">{t("settings.skills.title")}</div>
+          <h1>{t("settings.skills.selectWorkspaceTitle")}</h1>
+          <p>{t("settings.skills.selectWorkspaceBody")}</p>
         </div>
       </section>
     );
   }
+
+  const createSkill = () =>
+    onTrySkill({
+      name: "new-skill",
+      description: t("settings.skills.newDescription"),
+      filePath: "",
+      baseDir: workspace.path,
+      source: "project",
+      enabled: true,
+      disableModelInvocation: false,
+      slashCommand: "/skill:new-skill",
+    });
 
   const content = (
     <div className={`skills-view ${embedded ? "skills-view--embedded" : "conversation"}`}>
       {!embedded ? (
         <header className="view-header">
           <div>
-            <div className="chat-header__eyebrow">Skills</div>
-            <h1 className="view-header__title">Skills</h1>
-            <p className="view-header__body">
-              Give pi workspace-specific capabilities and reusable workflows.
-            </p>
-          </div>
-          <div className="view-header__actions">
-            <button className="button button--secondary" type="button" onClick={onRefresh}>
-              <RefreshIcon />
-              <span>Refresh</span>
-            </button>
-            <button
-              className="button button--primary"
-              type="button"
-              onClick={() =>
-                onTrySkill({
-                  name: "new-skill",
-                  description: "Create a new skill for this workspace",
-                  filePath: "",
-                  baseDir: workspace.path,
-                  source: "project",
-                  enabled: true,
-                  disableModelInvocation: false,
-                  slashCommand: "/skill:new-skill",
-                })
-              }
-            >
-              New skill
-            </button>
+            <div className="chat-header__eyebrow">{t("settings.skills.title")}</div>
+            <h1 className="view-header__title">{t("settings.skills.title")}</h1>
+            <p className="view-header__body">{t("settings.skills.body")}</p>
           </div>
         </header>
-      ) : (
-        <div className="settings-embedded-actions">
-          <button className="button button--secondary" type="button" onClick={onRefresh}>
-            <RefreshIcon />
-            <span>Refresh</span>
-          </button>
-          <button
-            className="button button--primary"
-            type="button"
-            onClick={() =>
-              onTrySkill({
-                name: "new-skill",
-                description: "Create a new skill for this workspace",
-                filePath: "",
-                baseDir: workspace.path,
-                source: "project",
-                enabled: true,
-                disableModelInvocation: false,
-                slashCommand: "/skill:new-skill",
-              })
-            }
-          >
-            New skill
-          </button>
-        </div>
-      )}
+      ) : null}
 
-        <div className="skills-toolbar">
+      <div className="settings-group settings-catalog">
+        <div className="settings-catalog__toolbar">
           <input
-            aria-label="Search skills"
-            className="skills-search"
-            placeholder="Search skills"
+            aria-label={t("settings.skills.search")}
+            className="settings-search model-manager__filter settings-catalog__search"
+            placeholder={t("settings.skills.search")}
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
             }}
           />
+          <div className="settings-row__actions settings-catalog__toolbar-actions">
+            <button className="button button--secondary model-manager__strong-button" type="button" onClick={onRefresh}>
+              <RefreshIcon />
+              <span>{t("settings.catalog.refresh")}</span>
+            </button>
+            <button className="button button--primary" type="button" onClick={createSkill}>
+              {t("settings.skills.new")}
+            </button>
+          </div>
         </div>
 
-        <div className="skills-layout">
-          <div className="skills-grid" data-testid="skills-list">
-            {filteredSkills.length === 0 ? (
-              <SkillsEmptyState message="Refresh discovery or create a new skill for this workspace." />
-            ) : (
-              filteredSkills.map((skill) => (
-                <button
-                  className={`skill-card ${selectedSkill?.filePath === skill.filePath ? "skill-card--active" : ""}`}
-                  key={skill.filePath}
-                  type="button"
-                  onClick={() => {
-                    setSelectedSkillPath(skill.filePath);
-                  }}
-                >
-                  <span className="skill-card__title-row">
-                    <span className="skill-card__title">{titleCase(skill.name)}</span>
-                    <span className={`skill-card__badge ${skill.enabled ? "skill-card__badge--enabled" : ""}`}>
-                      {skill.enabled ? "Enabled" : "Disabled"}
+        <div className="settings-catalog__body">
+          <aside className="settings-catalog__rail" aria-label="Skills">
+            <div className="model-manager__rail-head">
+              <div>
+                <div className="model-manager__section-label">{t("settings.skills.title")}</div>
+                <strong>{skills.length}</strong>
+              </div>
+              {query ? <span className="settings-catalog__result-count">{t("settings.catalog.shown", { count: filteredSkills.length })}</span> : null}
+            </div>
+            <div className="settings-catalog__list" data-testid="skills-list">
+              {filteredSkills.length === 0 ? (
+                <SkillsEmptyState title={t("settings.skills.empty")} message={t("settings.skills.emptyBody")} />
+              ) : (
+                filteredSkills.map((skill) => (
+                  <button
+                    className={`settings-catalog__item ${selectedSkill?.filePath === skill.filePath ? "settings-catalog__item--active" : ""}`}
+                    key={skill.filePath}
+                    type="button"
+                    onClick={() => {
+                      setSelectedSkillPath(skill.filePath);
+                    }}
+                  >
+                    <span className="settings-catalog__item-copy">
+                      <span className="settings-catalog__item-title">{titleCase(skill.name)}</span>
+                      <span className="settings-catalog__item-description">{skill.description}</span>
+                      <span className="settings-catalog__item-meta">
+                        <span>{skill.source}</span>
+                        <span>{skill.slashCommand}</span>
+                        {skill.disableModelInvocation ? <span>{t("settings.skills.slashOnlyBadge")}</span> : null}
+                      </span>
                     </span>
-                  </span>
-                  <span className="skill-card__description">{skill.description}</span>
-                  <span className="skill-card__meta">
-                    <span>{skill.source}</span>
-                    <span>{skill.slashCommand}</span>
-                    {skill.disableModelInvocation ? <span>slash only</span> : null}
-                  </span>
-                </button>
-              ))
-            )}
-          </div>
+                    <span className={`settings-catalog__badge ${skill.enabled ? "settings-catalog__badge--enabled" : ""}`}>
+                      {skill.enabled ? t("settings.catalog.enabled") : t("settings.catalog.disabled")}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          </aside>
 
-          <div className="skill-detail">
+          <section className="settings-catalog__detail" aria-label="Skill details">
             {selectedSkill ? (
               <>
-                <div className="skill-detail__header">
-                  <div>
+                <div className="settings-catalog__detail-head">
+                  <div className="settings-catalog__detail-title-block">
+                    <div className="model-manager__section-label">{t("settings.skills.selected")}</div>
                     <h2>{titleCase(selectedSkill.name)}</h2>
-                    <div className="skill-detail__slash">{selectedSkill.slashCommand}</div>
+                    <div className="settings-catalog__mono">{selectedSkill.slashCommand}</div>
                   </div>
-                  <span className={`skill-detail__status ${selectedSkill.enabled ? "skill-detail__status--enabled" : ""}`}>
-                    {selectedSkill.enabled ? "Enabled" : "Disabled"}
+                  <span className={`settings-catalog__badge settings-catalog__detail-status ${selectedSkill.enabled ? "settings-catalog__badge--enabled" : ""}`}>
+                    {selectedSkill.enabled ? t("settings.catalog.enabled") : t("settings.catalog.disabled")}
                   </span>
                 </div>
-                <p className="skill-detail__description">{selectedSkill.description}</p>
-                <div className="skill-detail__meta-list">
-                  <div>
-                    <div className="skill-detail__meta-label">Source</div>
-                    <div className="skill-detail__description">{selectedSkill.source}</div>
-                  </div>
-                  <div>
-                    <div className="skill-detail__meta-label">Path</div>
-                    <div className="skill-detail__path">{selectedSkill.filePath}</div>
-                  </div>
+                <p className="settings-catalog__description">{selectedSkill.description}</p>
+                <div className="settings-catalog__meta-grid">
+                  <DetailItem label={t("settings.catalog.source")} value={selectedSkill.source} />
+                  <DetailItem label={t("settings.skills.invocation")} value={selectedSkill.disableModelInvocation ? t("settings.skills.slashOnly") : t("settings.skills.modelAndSlash")} />
+                  <DetailItem label={t("settings.catalog.path")} value={selectedSkill.filePath} mono wide />
                 </div>
-                <div className="skill-detail__actions">
-                  <button className="button button--secondary" type="button" onClick={() => onOpenSkillFolder(selectedSkill.filePath)}>
-                    Open folder
+                <div className="settings-catalog__detail-actions">
+                  <button className="button button--secondary model-manager__strong-button" type="button" onClick={() => onOpenSkillFolder(selectedSkill.filePath)}>
+                    {t("settings.catalog.openFolder")}
                   </button>
                   <button
-                    className="button button--secondary"
+                    className="button button--secondary model-manager__strong-button"
                     type="button"
                     onClick={() => onToggleSkill(selectedSkill.filePath, !selectedSkill.enabled)}
                   >
-                    {selectedSkill.enabled ? "Disable" : "Enable"}
+                    {selectedSkill.enabled ? t("settings.catalog.disable") : t("settings.catalog.enable")}
                   </button>
                   <button className="button button--primary" type="button" onClick={() => onTrySkill(selectedSkill)}>
-                    Try
+                    {t("settings.skills.try")}
                   </button>
                 </div>
               </>
             ) : (
-              <SkillsEmptyState message="Refresh runtime discovery to load workspace and user-level skills." />
+              <SkillsEmptyState title={t("settings.skills.empty")} message={t("settings.skills.emptyRuntime")} />
             )}
-          </div>
+          </section>
         </div>
       </div>
+    </div>
   );
 
   if (embedded) {
@@ -213,10 +192,29 @@ export function SkillsView({
   return <section className="canvas">{content}</section>;
 }
 
-function SkillsEmptyState({ message }: { readonly message: string }) {
+function DetailItem({
+  label,
+  value,
+  mono,
+  wide,
+}: {
+  readonly label: string;
+  readonly value: string;
+  readonly mono?: boolean;
+  readonly wide?: boolean;
+}) {
   return (
-    <div className="empty-state">
-      <h2>No skills found</h2>
+    <div className={wide ? "settings-catalog__meta-item settings-catalog__meta-item--wide" : "settings-catalog__meta-item"}>
+      <div className="settings-catalog__meta-label">{label}</div>
+      <div className={mono ? "settings-catalog__mono" : "settings-catalog__meta-value"}>{value}</div>
+    </div>
+  );
+}
+
+function SkillsEmptyState({ title, message }: { readonly title: string; readonly message: string }) {
+  return (
+    <div className="settings-catalog__empty">
+      <h2>{title}</h2>
       <p>{message}</p>
     </div>
   );

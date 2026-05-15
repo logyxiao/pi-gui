@@ -19,6 +19,7 @@ import type {
   WorkspaceSessionTarget,
 } from "./desktop-state";
 import type {
+  CcSwitchSyncResult,
   ModelsJsonFile,
   ModelsJsonSaveResult,
   ProviderProbeResult,
@@ -81,6 +82,7 @@ export const desktopIpc = {
   testProvider: "pi-gui:test-provider",
   probeProvider: "pi-gui:probe-provider",
   syncEnabledModels: "pi-gui:sync-enabled-models",
+  syncCcSwitchProviders: "pi-gui:sync-cc-switch-providers",
   terminalEnsurePanel: "pi-gui:terminal-ensure-panel",
   terminalCreateSession: "pi-gui:terminal-create-session",
   terminalSetActiveSession: "pi-gui:terminal-set-active-session",
@@ -290,8 +292,9 @@ export interface PiDesktopApi {
   writeModelsJson(modelsJson: ModelsJsonFile): Promise<ModelsJsonSaveResult>;
   fetchProviderModels(provider: { readonly baseUrl: string; readonly apiKey?: string; readonly headers?: Record<string, string>; readonly authHeader?: boolean }): Promise<ProviderProbeResult>;
   testProvider(provider: { readonly baseUrl: string; readonly apiKey?: string; readonly headers?: Record<string, string>; readonly authHeader?: boolean }): Promise<ProviderProbeResult>;
-  probeProvider(provider: { readonly baseUrl: string; readonly apiKey?: string; readonly headers?: Record<string, string>; readonly authHeader?: boolean; readonly balanceBaseUrl?: string; readonly balanceApiKey?: string }): Promise<ProviderProbeResult>;
+  probeProvider(provider: { readonly baseUrl: string; readonly apiKey?: string; readonly headers?: Record<string, string>; readonly authHeader?: boolean; readonly balanceBaseUrl?: string; readonly balanceApiKey?: string; readonly usageScript?: string }): Promise<ProviderProbeResult>;
   syncEnabledModels(modelsJson: ModelsJsonFile): Promise<string[]>;
+  syncCcSwitchProviders(): Promise<CcSwitchSyncResult>;
   ensureTerminalPanel(
     workspaceId: string,
     terminalScopeId: string,

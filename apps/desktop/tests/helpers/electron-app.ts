@@ -507,6 +507,57 @@ export async function seedBranchedTreeSessionFixture(
   });
 }
 
+export async function seedMarkdownTranscriptFixture(
+  agentDir: string,
+  workspacePath: string,
+): Promise<{
+  readonly sessionId: string;
+  readonly title: "Markdown fixture session";
+}> {
+  const { SessionManager } = (await import(
+    "../../../../node_modules/@earendil-works/pi-coding-agent/dist/core/session-manager.js"
+  )) as {
+    SessionManager: {
+      create(cwd: string): {
+        appendMessage(message: Record<string, unknown>): string;
+        appendSessionInfo(name: string): string;
+        getSessionId(): string;
+      };
+    };
+  };
+
+  return withAgentDirEnv(agentDir, async () => {
+    const sessionManager = SessionManager.create(workspacePath);
+    let timestamp = Date.now();
+    const nextTimestamp = () => {
+      timestamp += 1_000;
+      return timestamp;
+    };
+
+    sessionManager.appendMessage({
+      role: "user",
+      content: "Render markdown",
+      timestamp: nextTimestamp(),
+    });
+    sessionManager.appendMessage({
+      role: "assistant",
+      content: [
+        {
+          type: "text",
+          text: "# Markdown heading\n\n- First item\n- Second item\n\n```ts\nconst value = 1;\n```",
+        },
+      ],
+      timestamp: nextTimestamp(),
+    });
+    sessionManager.appendSessionInfo("Markdown fixture session");
+
+    return {
+      sessionId: sessionManager.getSessionId(),
+      title: "Markdown fixture session",
+    };
+  });
+}
+
 export async function seedToolResultTreeSessionFixture(
   agentDir: string,
   workspacePath: string,

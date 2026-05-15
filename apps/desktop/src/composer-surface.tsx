@@ -10,6 +10,7 @@ import { hasFilesInDataTransfer } from "./composer-attachments";
 import { ExtensionDock, type ExtensionDockModel } from "./extension-session-ui";
 import { FileIcon, ModelIcon, ReasoningIcon, SettingsIcon, SkillIcon, SparkIcon, StatusIcon } from "./icons";
 import { QueuedComposerMessages } from "./queued-composer-messages";
+import { useI18n } from "./i18n";
 
 interface ComposerSurfaceProps {
   readonly lastError?: string;
@@ -96,6 +97,7 @@ export function ComposerSurface({
   onToggleExtensionDock,
   footer,
 }: ComposerSurfaceProps) {
+  const { t } = useI18n();
   const [isDragActive, setIsDragActive] = useState(false);
   const dragDepthRef = useRef(0);
 
@@ -151,7 +153,7 @@ export function ComposerSurface({
     >
       {isDragActive ? (
         <div className="composer__drop-indicator" data-testid="composer-drop-indicator">
-          Drop images or files to attach
+          {t("composer.dropFiles")}
         </div>
       ) : null}
       {activeSlashCommand ? (
@@ -166,7 +168,7 @@ export function ComposerSurface({
             ) : null}
           </span>
           <button
-            aria-label={`Clear ${activeSlashCommand.title}`}
+            aria-label={t("composer.clearSlashCommand", { title: activeSlashCommand.title })}
             className="composer__slash-intent-clear"
             type="button"
             onClick={onClearSlashCommand}
@@ -200,7 +202,7 @@ export function ComposerSurface({
               )}
               <span className="composer-attachment__name">{attachment.name}</span>
               <button
-                aria-label={`Remove ${attachment.name}`}
+                aria-label={t("composer.removeAttachment", { name: attachment.name })}
                 className="composer-attachment__remove"
                 type="button"
                 onClick={() => onRemoveAttachment(attachment.id)}
@@ -273,7 +275,7 @@ export function ComposerSurface({
                               <span className="slash-menu__title">{command.title}</span>
                               {command.sourceLabel ? <span className="slash-menu__skill-badge">{command.sourceLabel}</span> : null}
                               {command.compatibility?.status === "terminal-only" ? (
-                                <span className="slash-menu__skill-badge slash-menu__skill-badge--warning">Terminal-only</span>
+                                <span className="slash-menu__skill-badge slash-menu__skill-badge--warning">{t("composer.terminalOnly")}</span>
                               ) : null}
                             </span>
                             <span className="slash-menu__description">{command.description}</span>

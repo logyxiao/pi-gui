@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { RuntimeExtensionRecord, RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
 import type { ExtensionCommandCompatibilityRecord, WorkspaceRecord } from "./desktop-state";
 import { RefreshIcon } from "./icons";
+import { useI18n } from "./i18n";
 
 interface ExtensionsViewProps {
   readonly workspace?: WorkspaceRecord;
@@ -22,6 +23,7 @@ export function ExtensionsView({
   onToggleExtension,
   embedded = false,
 }: ExtensionsViewProps) {
+  const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [selectedExtensionPath, setSelectedExtensionPath] = useState<string | undefined>();
   const extensions = runtime?.extensions ?? [];
@@ -62,9 +64,9 @@ export function ExtensionsView({
     return (
       <section className="canvas canvas--empty">
         <div className="empty-panel">
-          <div className="session-header__eyebrow">Extensions</div>
-          <h1>Select a workspace</h1>
-          <p>Extensions are discovered from the selected workspace plus your user-level extension directories.</p>
+          <div className="session-header__eyebrow">{t("settings.extensions.title")}</div>
+          <h1>{t("settings.extensions.selectWorkspaceTitle")}</h1>
+          <p>{t("settings.extensions.selectWorkspaceBody")}</p>
         </div>
       </section>
     );
@@ -75,123 +77,126 @@ export function ExtensionsView({
       {!embedded ? (
         <header className="view-header">
           <div>
-            <div className="chat-header__eyebrow">Extensions</div>
-            <h1 className="view-header__title">Extensions</h1>
-            <p className="view-header__body">
-              Inspect and manage first-class runtime extensions for this workspace.
-            </p>
-          </div>
-          <div className="view-header__actions">
-            <button className="button button--secondary" type="button" onClick={onRefresh}>
-              <RefreshIcon />
-              <span>Refresh</span>
-            </button>
+            <div className="chat-header__eyebrow">{t("settings.extensions.title")}</div>
+            <h1 className="view-header__title">{t("settings.extensions.title")}</h1>
+            <p className="view-header__body">{t("settings.extensions.body")}</p>
           </div>
         </header>
-      ) : (
-        <div className="settings-embedded-actions">
-          <button className="button button--secondary" type="button" onClick={onRefresh}>
-            <RefreshIcon />
-            <span>Refresh</span>
-          </button>
-        </div>
-      )}
+      ) : null}
 
-        <div className="skills-toolbar">
+      <div className="settings-group settings-catalog">
+        <div className="settings-catalog__toolbar">
           <input
-            aria-label="Search extensions"
-            className="skills-search"
-            placeholder="Search extensions"
+            aria-label={t("settings.extensions.search")}
+            className="settings-search model-manager__filter settings-catalog__search"
+            placeholder={t("settings.extensions.search")}
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
             }}
           />
+          <div className="settings-row__actions settings-catalog__toolbar-actions">
+            <button className="button button--secondary model-manager__strong-button" type="button" onClick={onRefresh}>
+              <RefreshIcon />
+              <span>{t("settings.catalog.refresh")}</span>
+            </button>
+          </div>
         </div>
 
-        <div className="skills-layout">
-          <div className="skills-grid" data-testid="extensions-list">
-            {filteredExtensions.length === 0 ? (
-              <ExtensionsEmptyState message="Refresh runtime discovery to load workspace and user-level extensions." />
-            ) : (
-              filteredExtensions.map((extension) => (
-                <button
-                  className={`skill-card ${selectedExtension?.path === extension.path ? "skill-card--active" : ""}`}
-                  key={extension.path}
-                  type="button"
-                  onClick={() => {
-                    setSelectedExtensionPath(extension.path);
-                  }}
-                >
-                  <span className="skill-card__title-row">
-                    <span className="skill-card__title">{extension.displayName}</span>
-                    <span className={`skill-card__badge ${extension.enabled ? "skill-card__badge--enabled" : ""}`}>
-                      {extension.enabled ? "Enabled" : "Disabled"}
+        <div className="settings-catalog__body">
+          <aside className="settings-catalog__rail" aria-label={t("settings.extensions.title")}>
+            <div className="model-manager__rail-head">
+              <div>
+                <div className="model-manager__section-label">{t("settings.extensions.title")}</div>
+                <strong>{extensions.length}</strong>
+              </div>
+              {query ? <span className="settings-catalog__result-count">{t("settings.catalog.shown", { count: filteredExtensions.length })}</span> : null}
+            </div>
+            <div className="settings-catalog__list" data-testid="extensions-list">
+              {filteredExtensions.length === 0 ? (
+                <ExtensionsEmptyState title={t("settings.extensions.empty")} message={t("settings.extensions.emptyBody")} />
+              ) : (
+                filteredExtensions.map((extension) => (
+                  <button
+                    className={`settings-catalog__item ${selectedExtension?.path === extension.path ? "settings-catalog__item--active" : ""}`}
+                    key={extension.path}
+                    type="button"
+                    onClick={() => {
+                      setSelectedExtensionPath(extension.path);
+                    }}
+                  >
+                    <span className="settings-catalog__item-copy">
+                      <span className="settings-catalog__item-title">{extension.displayName}</span>
+                      <span className="settings-catalog__item-description">
+                        {extension.sourceInfo.scope} · {extension.sourceInfo.origin}
+                      </span>
+                      <span className="settings-catalog__item-meta">
+                        <span>{extension.sourceInfo.source}</span>
+                        {extension.commands.length > 0 ? <span>{t("settings.extensions.commandsCount", { count: extension.commands.length })}</span> : null}
+                        {extension.tools.length > 0 ? <span>{t("settings.extensions.toolsCount", { count: extension.tools.length })}</span> : null}
+                        {extension.diagnostics.length > 0 ? <span>{t("settings.extensions.issuesCount", { count: extension.diagnostics.length })}</span> : null}
+                      </span>
                     </span>
-                  </span>
-                  <span className="skill-card__description">
-                    {extension.sourceInfo.scope} · {extension.sourceInfo.origin}
-                  </span>
-                  <span className="skill-card__meta">
-                    <span>{extension.sourceInfo.source}</span>
-                    {extension.commands.length > 0 ? <span>{extension.commands.length} commands</span> : null}
-                    {extension.tools.length > 0 ? <span>{extension.tools.length} tools</span> : null}
-                    {extension.diagnostics.length > 0 ? <span>{extension.diagnostics.length} issues</span> : null}
-                  </span>
-                </button>
-              ))
-            )}
-          </div>
+                    <span className={`settings-catalog__badge ${extension.enabled ? "settings-catalog__badge--enabled" : ""}`}>
+                      {extension.enabled ? t("settings.catalog.enabled") : t("settings.catalog.disabled")}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          </aside>
 
-          <div className="skill-detail">
+          <section className="settings-catalog__detail" aria-label="Extension details">
             {selectedExtension ? (
               <>
-                <div className="skill-detail__header">
-                  <div>
+                <div className="settings-catalog__detail-head">
+                  <div className="settings-catalog__detail-title-block">
+                    <div className="model-manager__section-label">{t("settings.extensions.selected")}</div>
                     <h2>{selectedExtension.displayName}</h2>
-                    <div className="skill-detail__slash">{selectedExtension.sourceInfo.source}</div>
+                    <div className="settings-catalog__mono">{selectedExtension.sourceInfo.source}</div>
                   </div>
-                  <span className={`skill-detail__status ${selectedExtension.enabled ? "skill-detail__status--enabled" : ""}`}>
-                    {selectedExtension.enabled ? "Enabled" : "Disabled"}
+                  <span className={`settings-catalog__badge settings-catalog__detail-status ${selectedExtension.enabled ? "settings-catalog__badge--enabled" : ""}`}>
+                    {selectedExtension.enabled ? t("settings.catalog.enabled") : t("settings.catalog.disabled")}
                   </span>
                 </div>
-                <div className="skill-detail__meta-list">
-                  <DetailItem label="Scope" value={selectedExtension.sourceInfo.scope} />
-                  <DetailItem label="Origin" value={selectedExtension.sourceInfo.origin} />
-                  <DetailItem label="Path" value={selectedExtension.path} mono />
+                <div className="settings-catalog__meta-grid">
+                  <DetailItem label={t("settings.catalog.scope")} value={selectedExtension.sourceInfo.scope} />
+                  <DetailItem label={t("settings.catalog.origin")} value={selectedExtension.sourceInfo.origin} />
+                  <DetailItem label={t("settings.catalog.path")} value={selectedExtension.path} mono wide />
                   {selectedExtension.sourceInfo.baseDir ? (
-                    <DetailItem label="Base dir" value={selectedExtension.sourceInfo.baseDir} mono />
+                    <DetailItem label={t("settings.catalog.baseDir")} value={selectedExtension.sourceInfo.baseDir} mono wide />
                   ) : null}
                 </div>
-                <div className="skill-detail__actions">
-                  <button className="button button--secondary" type="button" onClick={() => onOpenExtensionFolder(selectedExtension.path)}>
-                    Open folder
+                <div className="settings-catalog__detail-actions">
+                  <button className="button button--secondary model-manager__strong-button" type="button" onClick={() => onOpenExtensionFolder(selectedExtension.path)}>
+                    {t("settings.catalog.openFolder")}
                   </button>
                   <button
-                    className="button button--secondary"
+                    className="button button--secondary model-manager__strong-button"
                     type="button"
                     onClick={() => onToggleExtension(selectedExtension.path, !selectedExtension.enabled)}
                   >
-                    {selectedExtension.enabled ? "Disable" : "Enable"}
+                    {selectedExtension.enabled ? t("settings.catalog.disable") : t("settings.catalog.enable")}
                   </button>
                 </div>
 
-                <ExtensionContributionSection title="Commands" items={selectedExtension.commands} emptyLabel="No commands contributed." />
+                <ExtensionContributionSection title={t("settings.extensions.commands")} items={selectedExtension.commands} emptyLabel={t("settings.extensions.noCommands")} />
                 <ExtensionCompatibilitySection
                   commands={selectedExtension.commands}
                   compatibilityRecords={selectedCompatibilityRecords}
                 />
-                <ExtensionContributionSection title="Tools" items={selectedExtension.tools} emptyLabel="No tools contributed." />
-                <ExtensionContributionSection title="Flags" items={selectedExtension.flags} emptyLabel="No flags contributed." />
-                <ExtensionContributionSection title="Shortcuts" items={selectedExtension.shortcuts} emptyLabel="No shortcuts contributed." />
+                <ExtensionContributionSection title={t("settings.extensions.tools")} items={selectedExtension.tools} emptyLabel={t("settings.extensions.noTools")} />
+                <ExtensionContributionSection title={t("settings.extensions.flags")} items={selectedExtension.flags} emptyLabel={t("settings.extensions.noFlags")} />
+                <ExtensionContributionSection title={t("settings.extensions.shortcuts")} items={selectedExtension.shortcuts} emptyLabel={t("settings.extensions.noShortcuts")} />
                 <ExtensionDiagnostics diagnostics={selectedExtension.diagnostics} />
               </>
             ) : (
-              <ExtensionsEmptyState message="Refresh runtime discovery to inspect extension metadata and diagnostics." />
+              <ExtensionsEmptyState title={t("settings.extensions.empty")} message={t("settings.extensions.emptyInspect")} />
             )}
-          </div>
+          </section>
         </div>
       </div>
+    </div>
   );
 
   if (embedded) {
@@ -205,15 +210,17 @@ function DetailItem({
   label,
   value,
   mono,
+  wide,
 }: {
   readonly label: string;
   readonly value: string;
   readonly mono?: boolean;
+  readonly wide?: boolean;
 }) {
   return (
-    <div>
-      <div className="skill-detail__meta-label">{label}</div>
-      <div className={mono ? "skill-detail__path" : "skill-detail__description"}>{value}</div>
+    <div className={wide ? "settings-catalog__meta-item settings-catalog__meta-item--wide" : "settings-catalog__meta-item"}>
+      <div className="settings-catalog__meta-label">{label}</div>
+      <div className={mono ? "settings-catalog__mono" : "settings-catalog__meta-value"}>{value}</div>
     </div>
   );
 }
@@ -228,22 +235,20 @@ function ExtensionContributionSection({
   readonly emptyLabel: string;
 }) {
   return (
-    <div className="skill-detail__meta-list">
-      <div>
-        <div className="skill-detail__meta-label">{title}</div>
-        {items.length > 0 ? (
-          <div className="extension-detail__tokens">
-            {items.map((item) => (
-              <span className="slash-menu__skill-badge" key={item}>
-                {item}
-              </span>
-            ))}
-          </div>
-        ) : (
-          <div className="skill-detail__description">{emptyLabel}</div>
-        )}
-      </div>
-    </div>
+    <section className="settings-catalog__subsection">
+      <div className="settings-catalog__meta-label">{title}</div>
+      {items.length > 0 ? (
+        <div className="extension-detail__tokens">
+          {items.map((item) => (
+            <span className="slash-menu__skill-badge" key={item}>
+              {item}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <div className="settings-catalog__meta-value">{emptyLabel}</div>
+      )}
+    </section>
   );
 }
 
@@ -252,24 +257,23 @@ function ExtensionDiagnostics({
 }: {
   readonly diagnostics: RuntimeExtensionRecord["diagnostics"];
 }) {
+  const { t } = useI18n();
   return (
-    <div className="skill-detail__meta-list">
-      <div>
-        <div className="skill-detail__meta-label">Diagnostics</div>
-        {diagnostics.length > 0 ? (
-          <div className="extension-detail__diagnostics">
-            {diagnostics.map((diagnostic, index) => (
-              <div className={`activity-item activity-item--${diagnostic.type === "error" ? "error" : "info"}`} key={`${diagnostic.message}:${index}`}>
-                <div className="activity-item__text">{diagnostic.message}</div>
-                {diagnostic.path ? <div className="activity-item__meta">{diagnostic.path}</div> : null}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="skill-detail__description">No diagnostics reported.</div>
-        )}
-      </div>
-    </div>
+    <section className="settings-catalog__subsection">
+      <div className="settings-catalog__meta-label">{t("settings.extensions.diagnostics")}</div>
+      {diagnostics.length > 0 ? (
+        <div className="extension-detail__diagnostics">
+          {diagnostics.map((diagnostic, index) => (
+            <div className={`activity-item activity-item--${diagnostic.type === "error" ? "error" : "info"}`} key={`${diagnostic.message}:${index}`}>
+              <div className="activity-item__text">{diagnostic.message}</div>
+              {diagnostic.path ? <div className="activity-item__meta">{diagnostic.path}</div> : null}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="settings-catalog__meta-value">{t("settings.extensions.noDiagnostics")}</div>
+      )}
+    </section>
   );
 }
 
@@ -280,6 +284,7 @@ function ExtensionCompatibilitySection({
   readonly commands: readonly string[];
   readonly compatibilityRecords: readonly ExtensionCommandCompatibilityRecord[];
 }) {
+  const { t } = useI18n();
   const supported = compatibilityRecords.filter((record) => record.status === "supported");
   const terminalOnly = compatibilityRecords.filter((record) => record.status === "terminal-only");
   const unknown = commands.filter((commandName) =>
@@ -289,38 +294,34 @@ function ExtensionCompatibilitySection({
   );
 
   return (
-    <div className="skill-detail__meta-list">
-      <div>
-        <div className="skill-detail__meta-label">Command compatibility</div>
-        <div className="skill-detail__description">
-          Learned from real GUI execution. Unlisted commands remain unknown until exercised.
-        </div>
-        <div className="extension-detail__tokens">
-          {supported.map((record) => (
-            <span className="slash-menu__skill-badge" key={`supported:${record.commandName}`}>
-              {record.commandName} · GUI-compatible
-            </span>
-          ))}
-          {terminalOnly.map((record) => (
-            <span className="slash-menu__skill-badge slash-menu__skill-badge--warning" key={`terminal:${record.commandName}`}>
-              {record.commandName} · Terminal-only
-            </span>
-          ))}
-          {unknown.map((commandName) => (
-            <span className="slash-menu__skill-badge" key={`unknown:${commandName}`}>
-              {commandName} · Unknown
-            </span>
-          ))}
-        </div>
+    <section className="settings-catalog__subsection">
+      <div className="settings-catalog__meta-label">{t("settings.extensions.commandCompatibility")}</div>
+      <div className="settings-catalog__meta-value">{t("settings.extensions.compatibilityDescription")}</div>
+      <div className="extension-detail__tokens">
+        {supported.map((record) => (
+          <span className="slash-menu__skill-badge" key={`supported:${record.commandName}`}>
+            {record.commandName} · {t("settings.extensions.guiCompatible")}
+          </span>
+        ))}
+        {terminalOnly.map((record) => (
+          <span className="slash-menu__skill-badge slash-menu__skill-badge--warning" key={`terminal:${record.commandName}`}>
+            {record.commandName} · {t("settings.extensions.terminalOnly")}
+          </span>
+        ))}
+        {unknown.map((commandName) => (
+          <span className="slash-menu__skill-badge" key={`unknown:${commandName}`}>
+            {commandName} · {t("settings.extensions.unknown")}
+          </span>
+        ))}
       </div>
-    </div>
+    </section>
   );
 }
 
-function ExtensionsEmptyState({ message }: { readonly message: string }) {
+function ExtensionsEmptyState({ title, message }: { readonly title: string; readonly message: string }) {
   return (
-    <div className="empty-state">
-      <h2>No extensions found</h2>
+    <div className="settings-catalog__empty">
+      <h2>{title}</h2>
       <p>{message}</p>
     </div>
   );

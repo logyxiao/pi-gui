@@ -32,7 +32,7 @@ import type {
   StartThreadInput,
   WorkspaceSessionTarget,
 } from "../src/desktop-state";
-import type { ModelsJsonFile, ModelsJsonSaveResult, ProviderProbeResult } from "../src/models-json";
+import type { CcSwitchSyncResult, ModelsJsonFile, ModelsJsonSaveResult, ProviderProbeResult } from "../src/models-json";
 
 const devReloadMarkersEnabled = process.env.PI_APP_DEV_RELOAD_MARKERS === "1";
 
@@ -190,10 +190,12 @@ contextBridge.exposeInMainWorld("piApp", {
     ipcRenderer.invoke(desktopIpc.fetchProviderModels, provider) as Promise<ProviderProbeResult>,
   testProvider: (provider: { readonly baseUrl: string; readonly apiKey?: string; readonly headers?: Record<string, string>; readonly authHeader?: boolean }) =>
     ipcRenderer.invoke(desktopIpc.testProvider, provider) as Promise<ProviderProbeResult>,
-  probeProvider: (provider: { readonly baseUrl: string; readonly apiKey?: string; readonly headers?: Record<string, string>; readonly authHeader?: boolean; readonly balanceBaseUrl?: string; readonly balanceApiKey?: string }) =>
+  probeProvider: (provider: { readonly baseUrl: string; readonly apiKey?: string; readonly headers?: Record<string, string>; readonly authHeader?: boolean; readonly balanceBaseUrl?: string; readonly balanceApiKey?: string; readonly usageScript?: string }) =>
     ipcRenderer.invoke(desktopIpc.probeProvider, provider) as Promise<ProviderProbeResult>,
   syncEnabledModels: (modelsJson: ModelsJsonFile) =>
     ipcRenderer.invoke(desktopIpc.syncEnabledModels, modelsJson) as Promise<string[]>,
+  syncCcSwitchProviders: () =>
+    ipcRenderer.invoke(desktopIpc.syncCcSwitchProviders) as Promise<CcSwitchSyncResult>,
   ensureTerminalPanel: (workspaceId: string, terminalScopeId: string, size?: Partial<TerminalSize>) =>
     ipcRenderer.invoke(desktopIpc.terminalEnsurePanel, workspaceId, terminalScopeId, size) as Promise<TerminalPanelSnapshot>,
   createTerminalSession: (workspaceId: string, terminalScopeId: string, size?: Partial<TerminalSize>) =>

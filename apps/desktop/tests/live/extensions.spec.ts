@@ -155,9 +155,9 @@ test("labels local package extensions by package root instead of index entrypoin
     await expect(extensionCard).toBeVisible();
     await extensionCard.click();
 
-    await expect(window.locator(".skill-detail h2")).toHaveText("local-package-extension");
-    await expect(window.locator(".skill-detail")).toContainText("package-named-command");
-    await expect(window.locator(".skill-detail")).toContainText(packagePath);
+    await expect(window.locator(".settings-catalog__detail h2")).toHaveText("local-package-extension");
+    await expect(window.locator(".settings-catalog__detail")).toContainText("package-named-command");
+    await expect(window.locator(".settings-catalog__detail")).toContainText(packagePath);
   } finally {
     await harness.close();
   }
@@ -197,11 +197,11 @@ test("manages extensions and prefers runtime commands over colliding host action
     const extensionCard = extensionsList.getByRole("button", { name: /demo-extension/i });
     await expect(extensionCard).toBeVisible();
     await extensionCard.click();
-    await expect(window.locator(".skill-detail")).toContainText("settings");
-    await expect(window.locator(".skill-detail")).toContainText("prefill-demo");
+    await expect(window.locator(".settings-catalog__detail")).toContainText("settings");
+    await expect(window.locator(".settings-catalog__detail")).toContainText("prefill-demo");
 
     await window.getByRole("button", { name: "Disable", exact: true }).click();
-    await expect(window.locator(".skill-detail__status")).toHaveText("Disabled");
+    await expect(window.locator(".settings-catalog__detail-status")).toHaveText("Disabled");
     await window.getByRole("button", { name: "Back to app", exact: true }).click();
     await expect(window.locator(".topbar__session")).toHaveText("Inspect extension surface");
     await expect(window.getByTestId("extension-dock")).toHaveCount(0);
@@ -213,7 +213,7 @@ test("manages extensions and prefers runtime commands over colliding host action
     await window.getByRole("button", { name: "Extensions", exact: true }).click();
     await extensionCard.click();
     await window.getByRole("button", { name: "Enable", exact: true }).click();
-    await expect(window.locator(".skill-detail__status")).toHaveText("Enabled");
+    await expect(window.locator(".settings-catalog__detail-status")).toHaveText("Enabled");
     await window.getByRole("button", { name: "Back to app", exact: true }).click();
     await expect(window.locator(".topbar__session")).toHaveText("Extension Surface");
     await expect(window.getByTestId("extension-dock-summary")).toHaveText("Demo ready");
