@@ -5,6 +5,8 @@
 @import "./secondary-surface-layout.css";
 @import "./command-menus.css";
 @import "./settings-skills.css";
+@import "./shared-forms.css";
+@import "./searchable-select.css";
 @import "./tree-modal.css";
 @import "./responsive-layout.css";
 @import "./thread-search.css";

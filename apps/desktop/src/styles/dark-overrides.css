@@ -158,12 +158,23 @@
 }
 
 :root.dark .secondary-surface {
+  background: rgba(0, 0, 0, 0.48);
+}
+
+:root.dark .secondary-surface__dialog {
+  border-color: var(--line);
   background: var(--window);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
 }
 
 :root.dark .secondary-surface__sidebar {
   border-right-color: var(--line);
   background: var(--sidebar);
+}
+
+:root.dark .secondary-surface__close {
+  border-color: var(--line);
+  background: var(--surface);
 }
 
 :root.dark .secondary-surface__nav-item--active,
@@ -212,6 +223,25 @@
 :root.dark .settings-text-input {
   border-color: var(--line);
   background: var(--surface);
+}
+
+:root.dark .model-selector__dropdown,
+:root.dark .model-selector__search-wrap,
+:root.dark .model-selector__group-title {
+  border-color: var(--line);
+  background: var(--surface);
+}
+
+:root.dark .model-selector__item:hover:not(:disabled),
+:root.dark .model-selector__item:focus-visible {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: var(--surface-muted);
+}
+
+:root.dark .model-selector__item--active {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
 }
 
 :root.dark .settings-disclosure {
@@ -280,6 +310,12 @@
 :root.dark .extension-dialog__option {
   background: var(--surface-muted);
   border-color: var(--line);
+}
+
+:root.dark .extension-dialog__option:hover,
+:root.dark .extension-dialog__option:focus-visible {
+  border-color: var(--line-strong);
+  background: var(--surface);
 }
 
 :root.dark .tree-modal {

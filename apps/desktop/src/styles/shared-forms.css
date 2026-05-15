@@ -1,0 +1,226 @@
+/* Shared form control polish */
+
+:root {
+  --control-bg: oklch(99% 0.004 268);
+  --control-bg-hover: oklch(97.6% 0.007 268);
+  --control-border: oklch(88.4% 0.018 268);
+  --control-border-hover: oklch(81.5% 0.028 268);
+  --control-focus: color-mix(in oklch, var(--accent) 38%, transparent);
+  --scrollbar-track: color-mix(in oklch, var(--surface-muted) 52%, transparent);
+  --scrollbar-thumb: oklch(82% 0.022 268 / 0.82);
+  --scrollbar-thumb-hover: oklch(72% 0.032 268 / 0.92);
+}
+
+:root.dark {
+  --control-bg: #25262a;
+  --control-bg-hover: #2b2d31;
+  --control-border: #3a3c42;
+  --control-border-hover: #555862;
+  --control-focus: color-mix(in srgb, var(--accent) 44%, transparent);
+  --scrollbar-track: rgba(255, 255, 255, 0.035);
+  --scrollbar-thumb: rgba(126, 130, 143, 0.62);
+  --scrollbar-thumb-hover: rgba(146, 150, 164, 0.78);
+}
+
+.settings-select,
+.settings-search,
+.settings-text-input,
+.settings-textarea,
+.extension-dialog__editor {
+  border-color: var(--control-border);
+  background-color: var(--control-bg);
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.settings-select {
+  appearance: none;
+  padding-right: 34px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted-soft) 50%), linear-gradient(135deg, var(--muted-soft) 50%, transparent 50%);
+  background-position: calc(100% - 17px) 50%, calc(100% - 12px) 50%;
+  background-repeat: no-repeat;
+  background-size: 5px 5px, 5px 5px;
+}
+
+.settings-select option {
+  background: var(--control-bg);
+  color: var(--text-strong);
+}
+
+.settings-select:hover:not(:disabled),
+.settings-search:hover:not(:disabled),
+.settings-text-input:hover:not(:disabled),
+.settings-textarea:hover:not(:disabled),
+.extension-dialog__editor:hover:not(:disabled) {
+  border-color: var(--control-border-hover);
+  background-color: var(--control-bg-hover);
+}
+
+.settings-select:focus,
+.settings-search:focus,
+.settings-text-input:focus,
+.settings-textarea:focus,
+.extension-dialog__editor:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--control-focus);
+  outline: none;
+}
+
+.settings-select:disabled,
+.settings-search:disabled,
+.settings-text-input:disabled,
+.settings-textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.settings-search::placeholder,
+.settings-text-input::placeholder,
+.settings-textarea::placeholder {
+  color: var(--muted-subtle);
+}
+
+* {
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-width: thin;
+}
+
+.model-selector__dropdown,
+.model-selector__scrollarea,
+.extension-dialog__options,
+.settings-list,
+.secondary-surface__content,
+.model-manager__models,
+.tree-modal__list,
+.extension-dock__body,
+.extension-dialog__editor,
+.settings-textarea {
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar,
+.model-selector__dropdown::-webkit-scrollbar,
+.model-selector__scrollarea::-webkit-scrollbar,
+.extension-dialog__options::-webkit-scrollbar,
+.settings-list::-webkit-scrollbar,
+.secondary-surface__content::-webkit-scrollbar,
+.model-manager__models::-webkit-scrollbar,
+.tree-modal__list::-webkit-scrollbar,
+.extension-dock__body::-webkit-scrollbar,
+.extension-dialog__editor::-webkit-scrollbar,
+.settings-textarea::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+*::-webkit-scrollbar-track,
+.model-selector__dropdown::-webkit-scrollbar-track,
+.model-selector__scrollarea::-webkit-scrollbar-track,
+.extension-dialog__options::-webkit-scrollbar-track,
+.settings-list::-webkit-scrollbar-track,
+.secondary-surface__content::-webkit-scrollbar-track,
+.model-manager__models::-webkit-scrollbar-track,
+.tree-modal__list::-webkit-scrollbar-track,
+.extension-dock__body::-webkit-scrollbar-track,
+.extension-dialog__editor::-webkit-scrollbar-track,
+.settings-textarea::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: var(--scrollbar-track);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb,
+.model-selector__dropdown::-webkit-scrollbar-thumb,
+.model-selector__scrollarea::-webkit-scrollbar-thumb,
+.extension-dialog__options::-webkit-scrollbar-thumb,
+.settings-list::-webkit-scrollbar-thumb,
+.secondary-surface__content::-webkit-scrollbar-thumb,
+.model-manager__models::-webkit-scrollbar-thumb,
+.tree-modal__list::-webkit-scrollbar-thumb,
+.extension-dock__body::-webkit-scrollbar-thumb,
+.extension-dialog__editor::-webkit-scrollbar-thumb,
+.settings-textarea::-webkit-scrollbar-thumb {
+  min-height: 36px;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: var(--scrollbar-thumb);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover,
+.model-selector__dropdown::-webkit-scrollbar-thumb:hover,
+.model-selector__scrollarea::-webkit-scrollbar-thumb:hover,
+.extension-dialog__options::-webkit-scrollbar-thumb:hover,
+.settings-list::-webkit-scrollbar-thumb:hover,
+.secondary-surface__content::-webkit-scrollbar-thumb:hover,
+.model-manager__models::-webkit-scrollbar-thumb:hover,
+.tree-modal__list::-webkit-scrollbar-thumb:hover,
+.extension-dock__body::-webkit-scrollbar-thumb:hover,
+.extension-dialog__editor::-webkit-scrollbar-thumb:hover,
+.settings-textarea::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: padding-box;
+}
+
+input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  margin: 0;
+  border: 1px solid var(--control-border);
+  border-radius: 4px;
+  appearance: none;
+  background: var(--control-bg);
+  color: var(--button-primary-ink);
+  box-shadow: inset 0 1px 0 oklch(100% 0 0 / 0.38);
+  cursor: pointer;
+  display: grid;
+  place-content: center;
+  transition:
+    background 0.14s ease,
+    border-color 0.14s ease,
+    box-shadow 0.14s ease,
+    opacity 0.14s ease;
+}
+
+input[type="checkbox"]::before {
+  width: 7px;
+  height: 4px;
+  border: solid currentColor;
+  border-width: 0 0 2px 2px;
+  content: "";
+  opacity: 0;
+  transform: translateY(-1px) rotate(-45deg) scale(0.82);
+  transition:
+    opacity 0.12s ease,
+    transform 0.12s ease;
+}
+
+input[type="checkbox"]:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--control-bg-hover);
+}
+
+input[type="checkbox"]:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--control-focus);
+  outline: none;
+}
+
+input[type="checkbox"]:checked {
+  border-color: oklch(62% 0.045 268);
+  background: oklch(50% 0.035 268);
+}
+
+input[type="checkbox"]:checked::before {
+  opacity: 1;
+  transform: translateY(-1px) rotate(-45deg) scale(1);
+}
+
+input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}

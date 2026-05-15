@@ -90,18 +90,26 @@ export function ExtensionDialog({
   readonly onRespond: (response: HostUiResponse) => void;
 }) {
   const [draft, setDraft] = useState("");
+  const [selectQuery, setSelectQuery] = useState("");
 
   useEffect(() => {
     if (dialog.kind === "input") {
       setDraft(dialog.initialValue ?? "");
+      setSelectQuery("");
       return;
     }
     if (dialog.kind === "editor") {
       setDraft(dialog.initialValue ?? "");
+      setSelectQuery("");
       return;
     }
     setDraft("");
+    setSelectQuery("");
   }, [dialog]);
+
+  const filteredSelectOptions = dialog.kind === "select"
+    ? dialog.options.filter((option) => option.toLowerCase().includes(selectQuery.trim().toLowerCase()))
+    : [];
 
   return (
     <div className="extension-dialog-backdrop">
@@ -110,17 +118,30 @@ export function ExtensionDialog({
         {dialog.kind === "confirm" ? <p className="extension-dialog__body">{dialog.message}</p> : null}
 
         {dialog.kind === "select" ? (
-          <div className="extension-dialog__options">
-            {dialog.options.map((option) => (
-              <button
-                className="extension-dialog__option"
-                key={option}
-                type="button"
-                onClick={() => onRespond({ requestId: dialog.requestId, value: option })}
-              >
-                {option}
-              </button>
-            ))}
+          <div className="extension-dialog__select">
+            <input
+              autoFocus
+              aria-label={`Search ${dialog.title}`}
+              className="settings-search extension-dialog__search"
+              placeholder="Search options"
+              value={selectQuery}
+              onChange={(event) => setSelectQuery(event.target.value)}
+            />
+            <div className="extension-dialog__options">
+              {filteredSelectOptions.map((option) => (
+                <button
+                  className="extension-dialog__option"
+                  key={option}
+                  type="button"
+                  onClick={() => onRespond({ requestId: dialog.requestId, value: option })}
+                >
+                  {option}
+                </button>
+              ))}
+              {filteredSelectOptions.length === 0 ? (
+                <div className="extension-dialog__empty">No options match your search.</div>
+              ) : null}
+            </div>
           </div>
         ) : null}
 

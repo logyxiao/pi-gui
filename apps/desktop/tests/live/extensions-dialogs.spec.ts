@@ -23,7 +23,7 @@ export default function dialogExtension(pi) {
   pi.registerCommand("dialog-select", {
     description: "Open a select dialog",
     handler: async (_args, ctx) => {
-      const value = await ctx.ui.select("Pick an option", ["Alpha", "Beta"]);
+      const value = await ctx.ui.select("Pick an option", ["Alpha", "Beta", "Gamma"]);
       ctx.ui.notify(value ? "Selected " + value : "Select cancelled", "info");
     },
   });
@@ -136,6 +136,11 @@ test("renders extension dialogs in the Electron surface and routes responses bac
     await composer.fill("/dialog-select ");
     await composer.press("Enter");
     await expect(dialog).toContainText("Pick an option");
+    const selectSearch = dialog.getByRole("textbox", { name: "Search Pick an option" });
+    await expect(selectSearch).toBeFocused();
+    await selectSearch.fill("be");
+    await expect(dialog.getByRole("button", { name: "Alpha", exact: true })).toHaveCount(0);
+    await expect(dialog.getByRole("button", { name: "Gamma", exact: true })).toHaveCount(0);
     await dialog.getByRole("button", { name: "Beta", exact: true }).click();
     await expect(dialog).toHaveCount(0);
     await expect(window.locator(".timeline")).toContainText("Selected Beta");
@@ -153,7 +158,7 @@ test("renders extension dialogs in the Electron surface and routes responses bac
     await expect(dialog).toContainText("Edit note");
     const editor = dialog.locator("textarea");
     await editor.click();
-    await editor.press("Meta+A");
+    await editor.press("ControlOrMeta+A");
     await editor.press("Backspace");
     await editor.type("Line 1");
     await editor.press("Enter");

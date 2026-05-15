@@ -18,6 +18,11 @@ import type {
   StartThreadInput,
   WorkspaceSessionTarget,
 } from "./desktop-state";
+import type {
+  ModelsJsonFile,
+  ModelsJsonSaveResult,
+  ProviderProbeResult,
+} from "./models-json";
 
 export type DesktopNotificationPermissionStatus =
   | "granted"
@@ -70,6 +75,12 @@ export const desktopIpc = {
   respondToHostUiRequest: "pi-gui:respond-to-host-ui-request",
   setNotificationPreferences: "pi-gui:set-notification-preferences",
   setIntegratedTerminalShell: "pi-gui:set-integrated-terminal-shell",
+  readModelsJson: "pi-gui:read-models-json",
+  writeModelsJson: "pi-gui:write-models-json",
+  fetchProviderModels: "pi-gui:fetch-provider-models",
+  testProvider: "pi-gui:test-provider",
+  probeProvider: "pi-gui:probe-provider",
+  syncEnabledModels: "pi-gui:sync-enabled-models",
   terminalEnsurePanel: "pi-gui:terminal-ensure-panel",
   terminalCreateSession: "pi-gui:terminal-create-session",
   terminalSetActiveSession: "pi-gui:terminal-set-active-session",
@@ -275,6 +286,12 @@ export interface PiDesktopApi {
   ): Promise<DesktopAppState>;
   setNotificationPreferences(preferences: Partial<NotificationPreferences>): Promise<DesktopAppState>;
   setIntegratedTerminalShell(shell: string): Promise<DesktopAppState>;
+  readModelsJson(): Promise<ModelsJsonFile>;
+  writeModelsJson(modelsJson: ModelsJsonFile): Promise<ModelsJsonSaveResult>;
+  fetchProviderModels(provider: { readonly baseUrl: string; readonly apiKey?: string; readonly headers?: Record<string, string>; readonly authHeader?: boolean }): Promise<ProviderProbeResult>;
+  testProvider(provider: { readonly baseUrl: string; readonly apiKey?: string; readonly headers?: Record<string, string>; readonly authHeader?: boolean }): Promise<ProviderProbeResult>;
+  probeProvider(provider: { readonly baseUrl: string; readonly apiKey?: string; readonly headers?: Record<string, string>; readonly authHeader?: boolean; readonly balanceBaseUrl?: string; readonly balanceApiKey?: string }): Promise<ProviderProbeResult>;
+  syncEnabledModels(modelsJson: ModelsJsonFile): Promise<string[]>;
   ensureTerminalPanel(
     workspaceId: string,
     terminalScopeId: string,

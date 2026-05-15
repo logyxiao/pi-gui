@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { RuntimeSettingsSnapshot, RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
-import type { TranslationKey } from "./i18n";
+import type { TranslationKey, I18nContextValue } from "./i18n";
 
 export type SettingsSection = "appearance" | "general" | "providers" | "models" | "skills" | "extensions" | "notifications";
 
@@ -15,7 +15,22 @@ export function settingsPill(active: boolean): string {
   return `settings-pill${active ? " settings-pill--active" : ""}`;
 }
 
-export function labelForThinking(level: NonNullable<RuntimeSettingsSnapshot["defaultThinkingLevel"]>): string {
+export function labelForThinking(
+  level: NonNullable<RuntimeSettingsSnapshot["defaultThinkingLevel"]>,
+  t?: I18nContextValue["t"],
+): string {
+  if (t) {
+    switch (level) {
+      case "low":
+        return t("settings.models.reasoningLow");
+      case "medium":
+        return t("settings.models.reasoningMedium");
+      case "high":
+        return t("settings.models.reasoningHigh");
+      case "xhigh":
+        return t("settings.models.reasoningXHigh");
+    }
+  }
   if (level === "xhigh") {
     return "Extra High";
   }

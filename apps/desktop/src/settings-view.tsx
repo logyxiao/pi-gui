@@ -30,7 +30,6 @@ interface SettingsViewProps {
   readonly onSetDefaultModel: (provider: string, modelId: string) => void;
   readonly onSetThinkingLevel: (thinkingLevel: RuntimeSettingsSnapshot["defaultThinkingLevel"]) => void;
   readonly onToggleSkillCommands: (enabled: boolean) => void;
-  readonly onSetScopedModelPatterns: (patterns: readonly string[]) => void;
   readonly onLoginProvider: (providerId: string) => void;
   readonly onLogoutProvider: (providerId: string) => void;
   readonly onSetProviderApiKey: (providerId: string, apiKey: string) => Promise<string | undefined>;
@@ -65,7 +64,6 @@ export function SettingsView({
   onSetDefaultModel,
   onSetThinkingLevel,
   onToggleSkillCommands,
-  onSetScopedModelPatterns,
   onLoginProvider,
   onLogoutProvider,
   onSetProviderApiKey,
@@ -145,8 +143,8 @@ export function SettingsView({
           {section === "models" ? (
             <SettingsModelsSection
               runtime={runtime}
+              onRefreshRuntime={onRefreshRuntime}
               onSetDefaultModel={onSetDefaultModel}
-              onSetScopedModelPatterns={onSetScopedModelPatterns}
               onSetThinkingLevel={onSetThinkingLevel}
             />
           ) : null}

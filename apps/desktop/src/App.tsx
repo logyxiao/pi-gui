@@ -31,6 +31,7 @@ import { SkillsView } from "./skills-view";
 import { ExtensionsView } from "./extensions-view";
 import { SettingsView, type SettingsSection } from "./settings-view";
 import { SecondarySurface } from "./secondary-surface";
+import { SearchableSelect } from "./searchable-select";
 import { NewThreadView } from "./new-thread-view";
 import { buildThreadGroups } from "./thread-groups";
 import { Sidebar } from "./sidebar";
@@ -1859,16 +1860,13 @@ export default function App({
           <div className="surface-toolbar">
             <label className="surface-toolbar__field">
               <span>{t("common.workspace")}</span>
-              <select
+              <SearchableSelect
                 value={settingsWorkspace?.id ?? ""}
-                onChange={(event) => setSettingsWorkspaceId(event.target.value)}
-              >
-                {rootWorkspaceOptions.map((workspace) => (
-                  <option key={workspace.id} value={workspace.id}>
-                    {workspace.name}
-                  </option>
-                ))}
-              </select>
+                placeholder={t("common.workspace")}
+                searchPlaceholder={t("common.workspace")}
+                options={rootWorkspaceOptions.map((workspace) => ({ value: workspace.id, label: workspace.name }))}
+                onChange={(value) => setSettingsWorkspaceId(value)}
+              />
             </label>
           </div>
         ) : null}
@@ -1893,7 +1891,6 @@ export default function App({
           onSetIntegratedTerminalShell={handleSetIntegratedTerminalShell}
           onRequestNotificationPermission={handleRequestNotificationPermission}
           onOpenSystemNotificationSettings={handleOpenSystemNotificationSettings}
-          onSetScopedModelPatterns={handleSetScopedModelPatterns}
           onSetThemeMode={handleSetThemeMode}
           onSetLanguage={onSetLanguage}
           onSetThinkingLevel={handleSetThinkingLevel}

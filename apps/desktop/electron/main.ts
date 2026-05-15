@@ -11,7 +11,7 @@ import {
   type MessageBoxOptions,
 } from "electron";
 import { randomUUID } from "node:crypto";
-import { readFile, stat } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { DesktopAppStore } from "./app-store";
@@ -25,6 +25,14 @@ import {
 import { checkForUpdate, initUpdateChecker } from "./update-checker";
 import { ThemeManager } from "./theme-manager";
 import { TerminalService } from "./terminal-service";
+import {
+  fetchProviderModels,
+  probeProvider,
+  readModelsJson,
+  syncEnabledModelsToSettings,
+  testProvider,
+  writeModelsJson,
+} from "./models-json-service";
 import type { DesktopAppState, LanguageMode, ThemeMode } from "../src/desktop-state";
 import { desktopIpc, getDesktopCommandFromShortcut } from "../src/ipc";
 import { SUPPORTED_COMPOSER_IMAGE_TYPES } from "../src/composer-attachments";
@@ -378,7 +386,6 @@ app.setName("pi");
 
 const configuredUserDataDir = process.env.PI_APP_USER_DATA_DIR?.trim() || app.getPath("userData");
 app.setPath("userData", configuredUserDataDir);
-languageMode = resolveInitialLanguageMode();
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
@@ -400,6 +407,7 @@ app.whenReady().then(async () => {
   if (!hasSingleInstanceLock) {
     return;
   }
+  languageMode = await resolveInitialLanguageMode();
 
   // On macOS, packaged builds already render the dock icon from `icon.icns`
   // in the app bundle. In dev we override the generic Electron dock icon with
@@ -487,8 +495,9 @@ app.whenReady().then(async () => {
     return mode;
   });
   ipcMain.handle(desktopIpc.getLanguage, () => languageMode);
-  ipcMain.handle(desktopIpc.setLanguage, (_event, language: LanguageMode) => {
+  ipcMain.handle(desktopIpc.setLanguage, async (_event, language: LanguageMode) => {
     languageMode = normalizeLanguageMode(language) ?? "en";
+    await writeLanguagePreference(languageMode);
     return languageMode;
   });
   ipcMain.handle(desktopIpc.openExternal, (_event, url: string) => {
@@ -582,6 +591,12 @@ app.whenReady().then(async () => {
   ipcMain.handle(desktopIpc.setIntegratedTerminalShell, (_event, shellPath: string) =>
     store.setIntegratedTerminalShell(shellPath),
   );
+  ipcMain.handle(desktopIpc.readModelsJson, async () => readModelsJson());
+  ipcMain.handle(desktopIpc.writeModelsJson, async (_event, modelsJson) => writeModelsJson(modelsJson));
+  ipcMain.handle(desktopIpc.fetchProviderModels, async (_event, provider) => fetchProviderModels(provider));
+  ipcMain.handle(desktopIpc.testProvider, async (_event, provider) => testProvider(provider));
+  ipcMain.handle(desktopIpc.probeProvider, async (_event, provider) => probeProvider(provider));
+  ipcMain.handle(desktopIpc.syncEnabledModels, async (_event, modelsJson) => syncEnabledModelsToSettings(modelsJson));
   ipcMain.handle(desktopIpc.terminalEnsurePanel, (event, workspaceId: string, terminalScopeId: string, size) => {
     return getTerminalService().ensurePanel(event.sender, workspaceId, terminalScopeId, size);
   });
@@ -807,12 +822,36 @@ function resolveInitialWorkspacePaths(): readonly string[] {
   return [];
 }
 
-function resolveInitialLanguageMode(): LanguageMode {
+async function resolveInitialLanguageMode(): Promise<LanguageMode> {
   const envLanguage = normalizeLanguageMode(process.env.PI_APP_LANGUAGE);
   if (envLanguage) {
     return envLanguage;
   }
+  const savedLanguage = await readLanguagePreference();
+  if (savedLanguage) {
+    return savedLanguage;
+  }
   return normalizeLanguageMode(app.getLocale()) ?? "en";
+}
+
+async function readLanguagePreference(): Promise<LanguageMode | undefined> {
+  try {
+    const raw = await readFile(getLanguagePreferencePath(), "utf8");
+    const parsed = JSON.parse(raw) as { readonly language?: unknown };
+    return normalizeLanguageMode(typeof parsed.language === "string" ? parsed.language : undefined);
+  } catch {
+    return undefined;
+  }
+}
+
+async function writeLanguagePreference(language: LanguageMode): Promise<void> {
+  const filePath = getLanguagePreferencePath();
+  await mkdir(path.dirname(filePath), { recursive: true });
+  await writeFile(filePath, `${JSON.stringify({ language }, null, 2)}\n`, "utf8");
+}
+
+function getLanguagePreferencePath(): string {
+  return path.join(configuredUserDataDir, "language.json");
 }
 
 function normalizeLanguageMode(value: string | undefined | null): LanguageMode | undefined {
