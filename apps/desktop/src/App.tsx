@@ -1942,7 +1942,7 @@ export default function App({
     );
   }
 
-  const shellClassName = `shell${snapshot.sidebarCollapsed ? " shell--sidebar-collapsed" : ""}`;
+  const shellClassName = `shell shell--platform-${api.platform}${snapshot.sidebarCollapsed ? " shell--sidebar-collapsed" : ""}`;
 
   return (
     <div className={shellClassName}>

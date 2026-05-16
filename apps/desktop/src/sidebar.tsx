@@ -126,6 +126,7 @@ export function Sidebar(props: SidebarProps) {
       <div className="sidebar__top">
         <div className="sidebar__command-row">
           <button
+            aria-label={t("sidebar.newThread")}
             className="sidebar__new"
             type="button"
             disabled={!selectedWorkspace}

@@ -36,6 +36,7 @@ test("toggles and persists the primary sidebar from the button and keyboard shor
     const toggle = window.getByTestId("sidebar-toggle");
     await expect(toggle).toBeVisible();
     await expect(window.locator(".sidebar")).toBeVisible();
+    await expect(window.locator(".shell")).toHaveClass(/shell--platform-darwin/);
     const expandedMainBox = await window.locator(".main").boundingBox();
     expect(expandedMainBox).not.toBeNull();
 
