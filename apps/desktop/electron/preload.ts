@@ -280,6 +280,8 @@ contextBridge.exposeInMainWorld("piApp", {
     ipcRenderer.invoke(desktopIpc.generateCommitMessage, workspaceId, sessionId) as Promise<string>,
   getCommitHistory: (workspaceId: string) =>
     ipcRenderer.invoke(desktopIpc.getCommitHistory, workspaceId) as Promise<{ hash: string; subject: string; author: string; relativeTime: string; refs: readonly string[] }[]>,
+  getGitSyncStatus: (workspaceId: string) =>
+    ipcRenderer.invoke(desktopIpc.getGitSyncStatus, workspaceId) as Promise<{ ahead: number; behind: number; hasUpstream: boolean }>,
   toggleWindowMaximize: () => ipcRenderer.invoke(desktopIpc.toggleWindowMaximize) as Promise<void>,
   openExternal: (url: string) => ipcRenderer.invoke(desktopIpc.openExternal, url) as Promise<void>,
   getThemeMode: () => ipcRenderer.invoke(desktopIpc.getThemeMode) as Promise<"system" | "light" | "dark">,

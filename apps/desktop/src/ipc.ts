@@ -122,6 +122,7 @@ export const desktopIpc = {
   commitStagedChanges: "pi-gui:commit-staged-changes",
   generateCommitMessage: "pi-gui:generate-commit-message",
   getCommitHistory: "pi-gui:get-commit-history",
+  getGitSyncStatus: "pi-gui:get-git-sync-status",
   getThemeMode: "pi-gui:get-theme-mode",
   getResolvedTheme: "pi-gui:get-resolved-theme",
   setThemeMode: "pi-gui:set-theme-mode",
@@ -357,6 +358,7 @@ export interface PiDesktopApi {
   commitStagedChanges(workspaceId: string, message: string): Promise<void>;
   generateCommitMessage(workspaceId: string, sessionId?: string): Promise<string>;
   getCommitHistory(workspaceId: string): Promise<{ hash: string; subject: string; author: string; relativeTime: string; refs: readonly string[] }[]>;
+  getGitSyncStatus(workspaceId: string): Promise<{ ahead: number; behind: number; hasUpstream: boolean }>;
   toggleWindowMaximize(): Promise<void>;
   openExternal(url: string): Promise<void>;
   getThemeMode(): Promise<"system" | "light" | "dark">;

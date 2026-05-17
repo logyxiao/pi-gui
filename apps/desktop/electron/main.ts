@@ -21,6 +21,7 @@ import {
   getCommitHistory,
   getChangedFiles,
   getFileDiff,
+  getGitSyncStatus,
   stageAllFiles,
   stageFile,
   unstageAllFiles,
@@ -88,6 +89,22 @@ const OPEN_FOLDER_MENU_ITEM_ID = "file.open-folder";
 const CHECK_FOR_UPDATES_MENU_ITEM_ID = "app.check-for-updates";
 const MAX_CLIPBOARD_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_CLIPBOARD_IMAGE_DIMENSION = 8_192;
+
+type RendererIpcHandler = Parameters<typeof ipcMain.handle>[1];
+
+interface RegisteredIpcMetadata {
+  readonly exposedTo: "renderer";
+}
+
+const registeredIpcHandlers = new Map<string, RegisteredIpcMetadata>();
+
+function registerRendererIpc(channel: string, handler: RendererIpcHandler): void {
+  if (registeredIpcHandlers.has(channel)) {
+    throw new Error(`IPC handler already registered: ${channel}`);
+  }
+  registeredIpcHandlers.set(channel, { exposedTo: "renderer" });
+  ipcMain.handle(channel, handler);
+}
 
 function getTerminalService(): TerminalService {
   if (!terminalService) {
@@ -526,141 +543,141 @@ app.whenReady().then(async () => {
     stopUpdateChecker = initUpdateChecker();
   }
 
-  ipcMain.handle(desktopIpc.ping, () =>
+  registerRendererIpc(desktopIpc.ping, () =>
     devReloadMarkersEnabled ? `pi desktop ready:${MAIN_DEV_RELOAD_MARKER}` : "pi desktop ready",
   );
-  ipcMain.handle(desktopIpc.getThemeMode, () => themeManager.getMode());
-  ipcMain.handle(desktopIpc.getResolvedTheme, () => themeManager.getResolvedTheme());
-  ipcMain.handle(desktopIpc.setThemeMode, (_event, mode: ThemeMode) => {
+  registerRendererIpc(desktopIpc.getThemeMode, () => themeManager.getMode());
+  registerRendererIpc(desktopIpc.getResolvedTheme, () => themeManager.getResolvedTheme());
+  registerRendererIpc(desktopIpc.setThemeMode, (_event, mode: ThemeMode) => {
     themeManager.setMode(mode);
     return mode;
   });
-  ipcMain.handle(desktopIpc.getLanguage, () => languageMode);
-  ipcMain.handle(desktopIpc.setLanguage, async (_event, language: LanguageMode) => {
+  registerRendererIpc(desktopIpc.getLanguage, () => languageMode);
+  registerRendererIpc(desktopIpc.setLanguage, async (_event, language: LanguageMode) => {
     languageMode = normalizeLanguageMode(language) ?? "en";
     await writeLanguagePreference(languageMode);
     return languageMode;
   });
-  ipcMain.handle(desktopIpc.openExternal, (_event, url: string) => {
+  registerRendererIpc(desktopIpc.openExternal, (_event, url: string) => {
     const parsed = new URL(url);
     if (!["http:", "https:"].includes(parsed.protocol)) {
       throw new Error(`Refusing to open unsupported URL: ${url}`);
     }
     return shell.openExternal(url);
   });
-  ipcMain.handle(desktopIpc.stateRequest, () => store.getState());
-  ipcMain.handle(desktopIpc.selectedTranscriptRequest, () => store.getSelectedTranscript());
-  ipcMain.handle(desktopIpc.addWorkspacePath, (_event, workspacePath: string) => store.addWorkspace(workspacePath));
-  ipcMain.handle(desktopIpc.pickWorkspace, () => pickWorkspaceViaDialog());
-  ipcMain.handle(desktopIpc.selectWorkspace, (_event, workspaceId: string) => store.selectWorkspace(workspaceId));
-  ipcMain.handle(desktopIpc.renameWorkspace, (_event, workspaceId: string, displayName: string) =>
+  registerRendererIpc(desktopIpc.stateRequest, () => store.getState());
+  registerRendererIpc(desktopIpc.selectedTranscriptRequest, () => store.getSelectedTranscript());
+  registerRendererIpc(desktopIpc.addWorkspacePath, (_event, workspacePath: string) => store.addWorkspace(workspacePath));
+  registerRendererIpc(desktopIpc.pickWorkspace, () => pickWorkspaceViaDialog());
+  registerRendererIpc(desktopIpc.selectWorkspace, (_event, workspaceId: string) => store.selectWorkspace(workspaceId));
+  registerRendererIpc(desktopIpc.renameWorkspace, (_event, workspaceId: string, displayName: string) =>
     store.renameWorkspace(workspaceId, displayName),
   );
-  ipcMain.handle(desktopIpc.removeWorkspace, (_event, workspaceId: string) => store.removeWorkspace(workspaceId));
-  ipcMain.handle(desktopIpc.reorderWorkspaces, (_event, order: readonly string[]) => store.reorderWorkspaces(order));
-  ipcMain.handle(desktopIpc.openWorkspaceInFinder, async (_event, workspaceId: string) => {
+  registerRendererIpc(desktopIpc.removeWorkspace, (_event, workspaceId: string) => store.removeWorkspace(workspaceId));
+  registerRendererIpc(desktopIpc.reorderWorkspaces, (_event, order: readonly string[]) => store.reorderWorkspaces(order));
+  registerRendererIpc(desktopIpc.openWorkspaceInFinder, async (_event, workspaceId: string) => {
     const workspacePath = store.getWorkspacePath(workspaceId);
     if (!workspacePath) {
       throw new Error(`Unknown workspace: ${workspaceId}`);
     }
     await shell.openPath(workspacePath);
   });
-  ipcMain.handle(desktopIpc.createWorktree, (_event, input: CreateWorktreeInput) =>
+  registerRendererIpc(desktopIpc.createWorktree, (_event, input: CreateWorktreeInput) =>
     store.createWorktree(input),
   );
-  ipcMain.handle(desktopIpc.removeWorktree, (_event, input: RemoveWorktreeInput) =>
+  registerRendererIpc(desktopIpc.removeWorktree, (_event, input: RemoveWorktreeInput) =>
     store.removeWorktree(input),
   );
-  ipcMain.handle(desktopIpc.syncCurrentWorkspace, () => store.syncCurrentWorkspace());
-  ipcMain.handle(desktopIpc.selectSession, (_event, target: WorkspaceSessionTarget) =>
+  registerRendererIpc(desktopIpc.syncCurrentWorkspace, () => store.syncCurrentWorkspace());
+  registerRendererIpc(desktopIpc.selectSession, (_event, target: WorkspaceSessionTarget) =>
     store.selectSession(target),
   );
-  ipcMain.handle(desktopIpc.archiveSession, (_event, target: WorkspaceSessionTarget) =>
+  registerRendererIpc(desktopIpc.archiveSession, (_event, target: WorkspaceSessionTarget) =>
     store.archiveSession(target),
   );
-  ipcMain.handle(desktopIpc.unarchiveSession, (_event, target: WorkspaceSessionTarget) =>
+  registerRendererIpc(desktopIpc.unarchiveSession, (_event, target: WorkspaceSessionTarget) =>
     store.unarchiveSession(target),
   );
-  ipcMain.handle(desktopIpc.setActiveView, (_event, activeView) => store.setActiveView(activeView));
-  ipcMain.handle(desktopIpc.setSidebarCollapsed, (_event, collapsed: boolean) =>
+  registerRendererIpc(desktopIpc.setActiveView, (_event, activeView) => store.setActiveView(activeView));
+  registerRendererIpc(desktopIpc.setSidebarCollapsed, (_event, collapsed: boolean) =>
     store.setSidebarCollapsed(collapsed),
   );
-  ipcMain.handle(desktopIpc.refreshRuntime, (_event, workspaceId?: string) => store.refreshRuntime(workspaceId));
-  ipcMain.handle(desktopIpc.setModelSettingsScopeMode, (_event, mode) => store.setModelSettingsScopeMode(mode));
-  ipcMain.handle(desktopIpc.setSessionModel, (_event, workspaceId: string, sessionId: string, provider: string, modelId: string) =>
+  registerRendererIpc(desktopIpc.refreshRuntime, (_event, workspaceId?: string) => store.refreshRuntime(workspaceId));
+  registerRendererIpc(desktopIpc.setModelSettingsScopeMode, (_event, mode) => store.setModelSettingsScopeMode(mode));
+  registerRendererIpc(desktopIpc.setSessionModel, (_event, workspaceId: string, sessionId: string, provider: string, modelId: string) =>
     store.setSessionModel({ workspaceId, sessionId }, provider, modelId),
   );
-  ipcMain.handle(desktopIpc.setDefaultModel, (_event, workspaceId: string, provider: string, modelId: string) =>
+  registerRendererIpc(desktopIpc.setDefaultModel, (_event, workspaceId: string, provider: string, modelId: string) =>
     store.setDefaultModel(workspaceId, provider, modelId),
   );
-  ipcMain.handle(
+  registerRendererIpc(
     desktopIpc.setDefaultThinkingLevel,
     (_event, workspaceId: string, thinkingLevel) => store.setDefaultThinkingLevel(workspaceId, thinkingLevel),
   );
-  ipcMain.handle(
+  registerRendererIpc(
     desktopIpc.setSessionThinkingLevel,
     (_event, workspaceId: string, sessionId: string, thinkingLevel) =>
       store.setSessionThinkingLevel({ workspaceId, sessionId }, thinkingLevel),
   );
-  ipcMain.handle(desktopIpc.loginProvider, (_event, workspaceId: string, providerId: string) =>
+  registerRendererIpc(desktopIpc.loginProvider, (_event, workspaceId: string, providerId: string) =>
     store.loginProvider(workspaceId, providerId, createRuntimeLoginCallbacks()),
   );
-  ipcMain.handle(desktopIpc.logoutProvider, (_event, workspaceId: string, providerId: string) =>
+  registerRendererIpc(desktopIpc.logoutProvider, (_event, workspaceId: string, providerId: string) =>
     store.logoutProvider(workspaceId, providerId),
   );
-  ipcMain.handle(desktopIpc.setProviderApiKey, (_event, workspaceId: string, providerId: string, apiKey: string) =>
+  registerRendererIpc(desktopIpc.setProviderApiKey, (_event, workspaceId: string, providerId: string, apiKey: string) =>
     store.setProviderApiKey(workspaceId, providerId, apiKey),
   );
-  ipcMain.handle(desktopIpc.setEnableSkillCommands, (_event, workspaceId: string, enabled: boolean) =>
+  registerRendererIpc(desktopIpc.setEnableSkillCommands, (_event, workspaceId: string, enabled: boolean) =>
     store.setEnableSkillCommands(workspaceId, enabled),
   );
-  ipcMain.handle(desktopIpc.setScopedModelPatterns, (_event, workspaceId: string, patterns: readonly string[]) =>
+  registerRendererIpc(desktopIpc.setScopedModelPatterns, (_event, workspaceId: string, patterns: readonly string[]) =>
     store.setScopedModelPatterns(workspaceId, patterns),
   );
-  ipcMain.handle(desktopIpc.setSkillEnabled, (_event, workspaceId: string, filePath: string, enabled: boolean) =>
+  registerRendererIpc(desktopIpc.setSkillEnabled, (_event, workspaceId: string, filePath: string, enabled: boolean) =>
     store.setSkillEnabled(workspaceId, filePath, enabled),
   );
-  ipcMain.handle(desktopIpc.setExtensionEnabled, (_event, workspaceId: string, filePath: string, enabled: boolean) =>
+  registerRendererIpc(desktopIpc.setExtensionEnabled, (_event, workspaceId: string, filePath: string, enabled: boolean) =>
     store.setExtensionEnabled(workspaceId, filePath, enabled),
   );
-  ipcMain.handle(desktopIpc.respondToHostUiRequest, (_event, workspaceId: string, sessionId: string, response) =>
+  registerRendererIpc(desktopIpc.respondToHostUiRequest, (_event, workspaceId: string, sessionId: string, response) =>
     store.respondToHostUiRequest({ workspaceId, sessionId }, response),
   );
-  ipcMain.handle(desktopIpc.setNotificationPreferences, (_event, preferences) =>
+  registerRendererIpc(desktopIpc.setNotificationPreferences, (_event, preferences) =>
     store.setNotificationPreferences(preferences),
   );
-  ipcMain.handle(desktopIpc.setIntegratedTerminalShell, (_event, shellPath: string) =>
+  registerRendererIpc(desktopIpc.setIntegratedTerminalShell, (_event, shellPath: string) =>
     store.setIntegratedTerminalShell(shellPath),
   );
-  ipcMain.handle(desktopIpc.readModelsJson, async () => readModelsJson());
-  ipcMain.handle(desktopIpc.writeModelsJson, async (_event, modelsJson) => writeModelsJson(modelsJson));
-  ipcMain.handle(desktopIpc.fetchProviderModels, async (_event, provider) => fetchProviderModels(provider));
-  ipcMain.handle(desktopIpc.testProvider, async (_event, provider) => testProvider(provider));
-  ipcMain.handle(desktopIpc.probeProvider, async (_event, provider) => probeProvider(provider));
-  ipcMain.handle(desktopIpc.syncEnabledModels, async (_event, modelsJson) => syncEnabledModelsToSettings(modelsJson));
-  ipcMain.handle(desktopIpc.syncCcSwitchProviders, async () => syncCcSwitchProviders());
-  ipcMain.handle(desktopIpc.terminalEnsurePanel, (event, workspaceId: string, terminalScopeId: string, size) => {
+  registerRendererIpc(desktopIpc.readModelsJson, async () => readModelsJson());
+  registerRendererIpc(desktopIpc.writeModelsJson, async (_event, modelsJson) => writeModelsJson(modelsJson));
+  registerRendererIpc(desktopIpc.fetchProviderModels, async (_event, provider) => fetchProviderModels(provider));
+  registerRendererIpc(desktopIpc.testProvider, async (_event, provider) => testProvider(provider));
+  registerRendererIpc(desktopIpc.probeProvider, async (_event, provider) => probeProvider(provider));
+  registerRendererIpc(desktopIpc.syncEnabledModels, async (_event, modelsJson) => syncEnabledModelsToSettings(modelsJson));
+  registerRendererIpc(desktopIpc.syncCcSwitchProviders, async () => syncCcSwitchProviders());
+  registerRendererIpc(desktopIpc.terminalEnsurePanel, (event, workspaceId: string, terminalScopeId: string, size) => {
     return getTerminalService().ensurePanel(event.sender, workspaceId, terminalScopeId, size);
   });
-  ipcMain.handle(desktopIpc.terminalCreateSession, (event, workspaceId: string, terminalScopeId: string, size) => {
+  registerRendererIpc(desktopIpc.terminalCreateSession, (event, workspaceId: string, terminalScopeId: string, size) => {
     return getTerminalService().createSession(event.sender, workspaceId, terminalScopeId, size);
   });
-  ipcMain.handle(desktopIpc.terminalSetActiveSession, (event, workspaceId: string, terminalScopeId: string, terminalId: string) => {
+  registerRendererIpc(desktopIpc.terminalSetActiveSession, (event, workspaceId: string, terminalScopeId: string, terminalId: string) => {
     return getTerminalService().setActiveSession(event.sender, workspaceId, terminalScopeId, terminalId);
   });
-  ipcMain.handle(desktopIpc.terminalWrite, (event, terminalId: string, data: string) => {
+  registerRendererIpc(desktopIpc.terminalWrite, (event, terminalId: string, data: string) => {
     terminalService?.write(event.sender, terminalId, data);
   });
-  ipcMain.handle(desktopIpc.terminalResize, (event, terminalId: string, size) => {
+  registerRendererIpc(desktopIpc.terminalResize, (event, terminalId: string, size) => {
     terminalService?.resize(event.sender, terminalId, size);
   });
-  ipcMain.handle(desktopIpc.terminalRestartSession, (event, terminalId: string, size) => {
+  registerRendererIpc(desktopIpc.terminalRestartSession, (event, terminalId: string, size) => {
     return getTerminalService().restart(event.sender, terminalId, size);
   });
-  ipcMain.handle(desktopIpc.terminalCloseSession, (event, terminalId: string) => {
+  registerRendererIpc(desktopIpc.terminalCloseSession, (event, terminalId: string) => {
     return getTerminalService().close(event.sender, terminalId);
   });
-  ipcMain.handle(desktopIpc.terminalSetTitle, (event, terminalId: string, title: string) => {
+  registerRendererIpc(desktopIpc.terminalSetTitle, (event, terminalId: string, title: string) => {
     terminalService?.setTitle(event.sender, terminalId, title);
   });
   ipcMain.on(desktopIpc.terminalSetFocused, (event, focused: boolean) => {
@@ -670,35 +687,35 @@ app.whenReady().then(async () => {
       terminalFocusedWebContentsIds.delete(event.sender.id);
     }
   });
-  ipcMain.handle(desktopIpc.getNotificationPermissionStatus, () =>
+  registerRendererIpc(desktopIpc.getNotificationPermissionStatus, () =>
     notificationPermissionService?.getCurrentStatus() ?? Promise.resolve("unknown"),
   );
-  ipcMain.handle(desktopIpc.requestNotificationPermission, () =>
+  registerRendererIpc(desktopIpc.requestNotificationPermission, () =>
     notificationPermissionService?.requestPermission() ?? Promise.resolve("unknown"),
   );
-  ipcMain.handle(desktopIpc.openSystemNotificationSettings, () =>
+  registerRendererIpc(desktopIpc.openSystemNotificationSettings, () =>
     notificationPermissionService?.openSystemSettings() ?? Promise.resolve(),
   );
-  ipcMain.handle(desktopIpc.createSession, (_event, input: CreateSessionInput) =>
+  registerRendererIpc(desktopIpc.createSession, (_event, input: CreateSessionInput) =>
     store.createSession(input),
   );
-  ipcMain.handle(desktopIpc.startThread, (_event, input: StartThreadInput) => store.startThread(input));
-  ipcMain.handle(desktopIpc.openSkillInFinder, async (_event, workspaceId: string, filePath: string) => {
+  registerRendererIpc(desktopIpc.startThread, (_event, input: StartThreadInput) => store.startThread(input));
+  registerRendererIpc(desktopIpc.openSkillInFinder, async (_event, workspaceId: string, filePath: string) => {
     const resolved = store.getSkillFilePath(workspaceId, filePath);
     if (!resolved) {
       throw new Error(`Unknown skill: ${filePath}`);
     }
     await shell.openPath(path.dirname(resolved));
   });
-  ipcMain.handle(desktopIpc.openExtensionInFinder, async (_event, workspaceId: string, filePath: string) => {
+  registerRendererIpc(desktopIpc.openExtensionInFinder, async (_event, workspaceId: string, filePath: string) => {
     const resolved = store.getExtensionFilePath(workspaceId, filePath);
     if (!resolved) {
       throw new Error(`Unknown extension: ${filePath}`);
     }
     await shell.openPath(path.dirname(resolved));
   });
-  ipcMain.handle(desktopIpc.cancelCurrentRun, () => store.cancelCurrentRun());
-  ipcMain.handle(desktopIpc.pickComposerAttachments, async () => {
+  registerRendererIpc(desktopIpc.cancelCurrentRun, () => store.cancelCurrentRun());
+  registerRendererIpc(desktopIpc.pickComposerAttachments, async () => {
     const result = await dialog.showOpenDialog({
       properties: ["openFile", "multiSelections"],
       title: "Attach files",
@@ -709,98 +726,98 @@ app.whenReady().then(async () => {
     const attachments = await Promise.all(result.filePaths.map(readComposerAttachment));
     return store.addComposerAttachments(attachments);
   });
-  ipcMain.handle(desktopIpc.readClipboardImage, () => readClipboardImageAttachment());
-  ipcMain.handle(desktopIpc.addComposerAttachments, (_event, attachments: readonly ComposerAttachment[]) => {
+  registerRendererIpc(desktopIpc.readClipboardImage, () => readClipboardImageAttachment());
+  registerRendererIpc(desktopIpc.addComposerAttachments, (_event, attachments: readonly ComposerAttachment[]) => {
     const validated = attachments.flatMap(validateComposerAttachmentPayload);
     return store.addComposerAttachments(validated);
   });
-  ipcMain.handle(desktopIpc.removeComposerAttachment, (_event, attachmentId: string) =>
+  registerRendererIpc(desktopIpc.removeComposerAttachment, (_event, attachmentId: string) =>
     store.removeComposerAttachment(attachmentId),
   );
-  ipcMain.handle(desktopIpc.editQueuedComposerMessage, (_event, messageId: string, currentDraft?: string) =>
+  registerRendererIpc(desktopIpc.editQueuedComposerMessage, (_event, messageId: string, currentDraft?: string) =>
     store.editQueuedComposerMessage(messageId, currentDraft),
   );
-  ipcMain.handle(desktopIpc.cancelQueuedComposerEdit, () =>
+  registerRendererIpc(desktopIpc.cancelQueuedComposerEdit, () =>
     store.cancelQueuedComposerEdit(),
   );
-  ipcMain.handle(desktopIpc.removeQueuedComposerMessage, (_event, messageId: string) =>
+  registerRendererIpc(desktopIpc.removeQueuedComposerMessage, (_event, messageId: string) =>
     store.removeQueuedComposerMessage(messageId),
   );
-  ipcMain.handle(desktopIpc.steerQueuedComposerMessage, (_event, messageId: string) =>
+  registerRendererIpc(desktopIpc.steerQueuedComposerMessage, (_event, messageId: string) =>
     store.steerQueuedComposerMessage(messageId),
   );
-  ipcMain.handle(desktopIpc.updateComposerDraft, (_event, composerDraft: string) =>
+  registerRendererIpc(desktopIpc.updateComposerDraft, (_event, composerDraft: string) =>
     store.updateComposerDraft(composerDraft),
   );
-  ipcMain.handle(
+  registerRendererIpc(
     desktopIpc.submitComposer,
     (_event, text: string, options?: { readonly deliverAs?: "steer" | "followUp" }) => store.submitComposer(text, options),
   );
-  ipcMain.handle(desktopIpc.getSessionTree, (_event, target: WorkspaceSessionTarget) =>
+  registerRendererIpc(desktopIpc.getSessionTree, (_event, target: WorkspaceSessionTarget) =>
     store.getSessionTree(target),
   );
-  ipcMain.handle(
+  registerRendererIpc(
     desktopIpc.navigateSessionTree,
     (_event, target: WorkspaceSessionTarget, targetId: string, options) =>
       store.navigateSessionTree(target, targetId, options),
   );
-  ipcMain.handle(desktopIpc.listWorkspaceFiles, async (_event, workspaceId: string) => {
+  registerRendererIpc(desktopIpc.listWorkspaceFiles, async (_event, workspaceId: string) => {
     const workspacePath = store.getWorkspacePath(workspaceId);
     if (!workspacePath) {
       return [];
     }
     return listWorkspaceFiles(workspacePath);
   });
-  ipcMain.handle(desktopIpc.getChangedFiles, async (_event, workspaceId: string) => {
+  registerRendererIpc(desktopIpc.getChangedFiles, async (_event, workspaceId: string) => {
     const workspacePath = store.getWorkspacePath(workspaceId);
     if (!workspacePath) {
       return [];
     }
     return getChangedFiles(workspacePath);
   });
-  ipcMain.handle(desktopIpc.getFileDiff, async (_event, workspaceId: string, filePath: string, staged?: boolean) => {
+  registerRendererIpc(desktopIpc.getFileDiff, async (_event, workspaceId: string, filePath: string, staged?: boolean) => {
     const workspacePath = store.getWorkspacePath(workspaceId);
     if (!workspacePath) {
       return "";
     }
     return getFileDiff(workspacePath, filePath, staged === true);
   });
-  ipcMain.handle(desktopIpc.stageFile, async (_event, workspaceId: string, filePath: string) => {
+  registerRendererIpc(desktopIpc.stageFile, async (_event, workspaceId: string, filePath: string) => {
     const workspacePath = store.getWorkspacePath(workspaceId);
     if (!workspacePath) {
       throw new Error(`Unknown workspace: ${workspaceId}`);
     }
     await stageFile(workspacePath, filePath);
   });
-  ipcMain.handle(desktopIpc.unstageFile, async (_event, workspaceId: string, filePath: string) => {
+  registerRendererIpc(desktopIpc.unstageFile, async (_event, workspaceId: string, filePath: string) => {
     const workspacePath = store.getWorkspacePath(workspaceId);
     if (!workspacePath) {
       throw new Error(`Unknown workspace: ${workspaceId}`);
     }
     await unstageFile(workspacePath, filePath);
   });
-  ipcMain.handle(desktopIpc.stageAllFiles, async (_event, workspaceId: string) => {
+  registerRendererIpc(desktopIpc.stageAllFiles, async (_event, workspaceId: string) => {
     const workspacePath = store.getWorkspacePath(workspaceId);
     if (!workspacePath) {
       throw new Error(`Unknown workspace: ${workspaceId}`);
     }
     await stageAllFiles(workspacePath);
   });
-  ipcMain.handle(desktopIpc.unstageAllFiles, async (_event, workspaceId: string) => {
+  registerRendererIpc(desktopIpc.unstageAllFiles, async (_event, workspaceId: string) => {
     const workspacePath = store.getWorkspacePath(workspaceId);
     if (!workspacePath) {
       throw new Error(`Unknown workspace: ${workspaceId}`);
     }
     await unstageAllFiles(workspacePath);
   });
-  ipcMain.handle(desktopIpc.commitStagedChanges, async (_event, workspaceId: string, message: string) => {
+  registerRendererIpc(desktopIpc.commitStagedChanges, async (_event, workspaceId: string, message: string) => {
     const workspacePath = store.getWorkspacePath(workspaceId);
     if (!workspacePath) {
       throw new Error(`Unknown workspace: ${workspaceId}`);
     }
     await commitStagedChanges(workspacePath, message);
   });
-  ipcMain.handle(desktopIpc.generateCommitMessage, async (_event, workspaceId: string, sessionId?: string) => {
+  registerRendererIpc(desktopIpc.generateCommitMessage, async (_event, workspaceId: string, sessionId?: string) => {
     const workspacePath = store.getWorkspacePath(workspaceId);
     if (!workspacePath) {
       throw new Error(`Unknown workspace: ${workspaceId}`);
@@ -816,14 +833,21 @@ app.whenReady().then(async () => {
       ...resolveCommitMessageModel(state, workspaceId, sessionId),
     });
   });
-  ipcMain.handle(desktopIpc.getCommitHistory, async (_event, workspaceId: string) => {
+  registerRendererIpc(desktopIpc.getCommitHistory, async (_event, workspaceId: string) => {
     const workspacePath = store.getWorkspacePath(workspaceId);
     if (!workspacePath) {
       return [];
     }
     return getCommitHistory(workspacePath);
   });
-  ipcMain.handle(desktopIpc.toggleWindowMaximize, (event) => {
+  registerRendererIpc(desktopIpc.getGitSyncStatus, async (_event, workspaceId: string) => {
+    const workspacePath = store.getWorkspacePath(workspaceId);
+    if (!workspacePath) {
+      return { ahead: 0, behind: 0, hasUpstream: false };
+    }
+    return getGitSyncStatus(workspacePath);
+  });
+  registerRendererIpc(desktopIpc.toggleWindowMaximize, (event) => {
     const window = BrowserWindow.fromWebContents(event.sender);
     if (!window) {
       return;

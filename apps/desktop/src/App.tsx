@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type Dispatch, type DragEvent, type KeyboardEvent, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent, type SetStateAction } from "react";
 import type { SessionTreeSnapshot } from "@pi-gui/session-driver/types";
 import type { RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
 import {
@@ -9,7 +9,6 @@ import {
   type ComposerImageAttachment,
   type DesktopAppState,
   type NewThreadEnvironment,
-  type SelectedTranscriptRecord,
   type StartThreadInput,
   type WorktreeRecord,
   type WorkspaceRecord,
@@ -40,6 +39,9 @@ import { useTimelineController } from "./hooks/use-timeline-controller";
 import { useWorkspaceMenu } from "./hooks/use-workspace-menu";
 import { useDesktopCommands } from "./hooks/use-desktop-commands";
 import { useComposerController } from "./hooks/use-composer-controller";
+import { updateSnapshot, useDesktopAppState } from "./hooks/use-desktop-app-state";
+import { useRunningLabel } from "./hooks/use-running-label";
+import { useTerminalPanelController } from "./hooks/use-terminal-panel-controller";
 import { buildExtensionDockModel, hasExtensionDockContent } from "./extension-session-ui";
 import { ConfirmDialog, type ConfirmDialogProps } from "./confirm-dialog";
 import { ThreadView } from "./thread-view";
@@ -52,96 +54,8 @@ import {
 } from "./composer-attachments";
 import { useI18n, type LanguageCode } from "./i18n";
 
-function useDesktopAppState() {
-  const [snapshot, setSnapshot] = useState<DesktopAppState | null>(null);
-  const [selectedTranscript, setSelectedTranscript] = useState<SelectedTranscriptRecord | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    const api = window.piApp;
-    if (!api) {
-      return undefined;
-    }
-
-    void Promise.all([api.getState(), api.getSelectedTranscript()]).then(([state, transcript]) => {
-      if (!active) {
-        return;
-      }
-      setSnapshot(state);
-      setSelectedTranscript(transcript);
-    });
-
-    const unsubscribeState = api.onStateChanged((state) => {
-      if (active) {
-        setSnapshot(state);
-      }
-    });
-    const unsubscribeTranscript = api.onSelectedTranscriptChanged((payload) => {
-      if (active) {
-        setSelectedTranscript(payload);
-      }
-    });
-
-    return () => {
-      active = false;
-      unsubscribeState();
-      unsubscribeTranscript();
-    };
-  }, []);
-
-  return [snapshot, setSnapshot, selectedTranscript] as const;
-}
-
-function updateSnapshot(
-  api: NonNullable<typeof window.piApp>,
-  setSnapshot: Dispatch<SetStateAction<DesktopAppState | null>>,
-  action: () => Promise<DesktopAppState>,
-) {
-  return action().then((state) => {
-    setSnapshot(state);
-    return state;
-  });
-}
-
 function canTogglePrimarySidebar(view: AppView | undefined): boolean {
   return view === "threads" || view === "new-thread";
-}
-
-function useRunningLabel(startedAt: string | undefined) {
-  const [label, setLabel] = useState(() => formatRunningLabel(startedAt));
-
-  useEffect(() => {
-    setLabel(formatRunningLabel(startedAt));
-    if (!startedAt) {
-      return undefined;
-    }
-
-    const interval = window.setInterval(() => {
-      setLabel(formatRunningLabel(startedAt));
-    }, 1000);
-
-    return () => {
-      window.clearInterval(interval);
-    };
-  }, [startedAt]);
-
-  return label;
-}
-
-function formatRunningLabel(startedAt: string | undefined): string {
-  if (!startedAt) {
-    return "Working…";
-  }
-
-  const diffMs = Math.max(0, Date.now() - Date.parse(startedAt));
-  const seconds = Math.max(1, Math.floor(diffMs / 1000));
-  if (seconds < 60) {
-    return `Working for ${seconds}s`;
-  }
-
-  const minutes = Math.floor(seconds / 60);
-  const remaining = seconds % 60;
-  return remaining === 0 ? `Working for ${minutes}m` : `Working for ${minutes}m ${remaining}s`;
 }
 
 export default function App({
@@ -189,9 +103,6 @@ export default function App({
   const newThreadComposerRef = useRef<HTMLTextAreaElement | null>(null);
   const previousActiveViewRef = useRef<AppView | null>(null);
   const [showDiffPanel, setShowDiffPanel] = useState(false);
-  const [openTerminalSessionKeys, setOpenTerminalSessionKeys] = useState<ReadonlySet<string>>(() => new Set());
-  const [takeoverTerminalSessionKeys, setTakeoverTerminalSessionKeys] = useState<ReadonlySet<string>>(() => new Set());
-  const [terminalHeight, setTerminalHeight] = useState(340);
   const [diffFileRequest, setDiffFileRequest] = useState<DiffPanelFileRequest | null>(null);
   const api = window.piApp;
   const requestConfirm = useCallback(
@@ -374,8 +285,6 @@ export default function App({
   const editingQueuedMessageId = snapshot?.editingQueuedMessageId;
   const runningLabel = useRunningLabel(selectedSession?.status === "running" ? selectedSession.runningSince : undefined);
   const selectedSessionKey = selectedWorkspace && selectedSession ? `${selectedWorkspace.id}:${selectedSession.id}` : "";
-  const isTerminalVisibleForSelectedThread = Boolean(selectedSessionKey) && openTerminalSessionKeys.has(selectedSessionKey);
-  const isTerminalTakeoverForSelectedThread = Boolean(selectedSessionKey) && takeoverTerminalSessionKeys.has(selectedSessionKey);
   const activeTranscript =
     selectedTranscript &&
     selectedWorkspace &&
@@ -421,12 +330,6 @@ export default function App({
     snapshot,
   });
   const threadSearch = useThreadSearch(timelinePaneRef);
-  useEffect(() => {
-    if (snapshot && snapshot.workspaces.length === 0) {
-      setOpenTerminalSessionKeys(new Set());
-      setTakeoverTerminalSessionKeys(new Set());
-    }
-  }, [snapshot]);
   const selectedExtensionDock = useMemo(() => buildExtensionDockModel(selectedExtensionUi), [selectedExtensionUi]);
   const displayedSessionTitle = selectedExtensionUi?.title ?? selectedSession?.title ?? "";
   const activeExtensionDialog = selectedExtensionUi?.pendingDialogs[0];
@@ -440,25 +343,6 @@ export default function App({
       composerRef.current?.focus();
     });
   }, []);
-  const toggleTerminal = useCallback(() => {
-    if (!selectedSessionKey) {
-      return;
-    }
-    if (openTerminalSessionKeys.has(selectedSessionKey)) {
-      setOpenTerminalSessionKeys((current) => {
-        const next = new Set(current);
-        next.delete(selectedSessionKey);
-        return next;
-      });
-      setTakeoverTerminalSessionKeys((current) => {
-        const next = new Set(current);
-        next.delete(selectedSessionKey);
-        return next;
-      });
-      return;
-    }
-    setOpenTerminalSessionKeys((current) => new Set(current).add(selectedSessionKey));
-  }, [openTerminalSessionKeys, selectedSessionKey]);
   const focusNewThreadComposer = useCallback(() => {
     window.requestAnimationFrame(() => {
       newThreadComposerRef.current?.focus();
@@ -468,6 +352,19 @@ export default function App({
     setNewThreadComposerError(undefined);
     setNewThreadPrompt(value);
   }, []);
+  const {
+    handleTerminalHeightChange,
+    hideTerminal,
+    isTerminalTakeoverForSelectedThread,
+    isTerminalVisibleForSelectedThread,
+    terminalHeight,
+    toggleTerminal,
+    toggleTerminalTakeover,
+  } = useTerminalPanelController({
+    focusComposer,
+    selectedSessionKey,
+    workspaceCount: snapshot?.workspaces.length ?? 0,
+  });
 
   const handleViewFileInDiff = useCallback((path: string) => {
     setShowDiffPanel(true);
@@ -892,38 +789,9 @@ export default function App({
       sessionId={selectedSession?.id ?? ""}
       height={terminalHeight}
       isTakeover={isTerminalTakeoverForSelectedThread}
-      onHeightChange={(nextHeight) => {
-        setTerminalHeight(nextHeight);
-        setTakeoverTerminalSessionKeys((current) => {
-          const next = new Set(current);
-          next.delete(selectedSessionKey);
-          return next;
-        });
-      }}
-      onToggleTakeover={() => {
-        setTakeoverTerminalSessionKeys((current) => {
-          const next = new Set(current);
-          if (next.has(selectedSessionKey)) {
-            next.delete(selectedSessionKey);
-          } else {
-            next.add(selectedSessionKey);
-          }
-          return next;
-        });
-      }}
-      onHide={() => {
-        setOpenTerminalSessionKeys((current) => {
-          const next = new Set(current);
-          next.delete(selectedSessionKey);
-          return next;
-        });
-        setTakeoverTerminalSessionKeys((current) => {
-          const next = new Set(current);
-          next.delete(selectedSessionKey);
-          return next;
-        });
-        focusComposer();
-      }}
+      onHeightChange={handleTerminalHeightChange}
+      onToggleTakeover={toggleTerminalTakeover}
+      onHide={hideTerminal}
     />
   ) : null;
 

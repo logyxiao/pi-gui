@@ -23,6 +23,12 @@ interface CommitHistoryEntry {
   readonly refs: readonly string[];
 }
 
+interface GitSyncStatus {
+  readonly ahead: number;
+  readonly behind: number;
+  readonly hasUpstream: boolean;
+}
+
 type ChangeGroup = "staged" | "unstaged";
 const HISTORY_HEIGHT_MIN = 118;
 const HISTORY_HEIGHT_MAX = 520;
@@ -57,7 +63,7 @@ export function DiffPanel({
   const [commitMessage, setCommitMessage] = useState("");
   const [commitBusy, setCommitBusy] = useState(false);
   const [syncBusy, setSyncBusy] = useState(false);
-  const [showSyncAfterCleanCommit, setShowSyncAfterCleanCommit] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<GitSyncStatus>({ ahead: 0, behind: 0, hasUpstream: false });
   const [generatingMessage, setGeneratingMessage] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [historyExpanded, setHistoryExpanded] = useState(false);
@@ -78,15 +84,14 @@ export function DiffPanel({
     setLoading(true);
     setErrorMessage("");
     try {
-      const [result, history] = await Promise.all([
+      const [result, history, nextSyncStatus] = await Promise.all([
         api.getChangedFiles(workspaceId),
         api.getCommitHistory(workspaceId),
+        api.getGitSyncStatus(workspaceId),
       ]);
       setFiles(result);
       setCommitHistory(history);
-      if (result.length > 0) {
-        setShowSyncAfterCleanCommit(false);
-      }
+      setSyncStatus(nextSyncStatus);
       setRefreshNonce((value) => value + 1);
       setSelectedFile((current) =>
         current && !result.some((f) => f.path === current.path && (current.group === "staged" ? f.staged : f.unstaged)) ? null : current,
@@ -192,8 +197,7 @@ export function DiffPanel({
     void api.commitStagedChanges(workspaceId, message).then(async () => {
       setCommitMessage("");
       setCommitBusy(false);
-      const nextFiles = await refresh();
-      setShowSyncAfterCleanCommit(nextFiles?.length === 0);
+      await refresh();
     }).catch((error: unknown) => {
       setErrorMessage(error instanceof Error ? error.message : t("changes.errorCommit"));
       setCommitBusy(false);
@@ -204,7 +208,6 @@ export function DiffPanel({
     setSyncBusy(true);
     setErrorMessage("");
     void api.syncCurrentWorkspace().then(async () => {
-      setShowSyncAfterCleanCommit(false);
       await refresh();
       setSyncBusy(false);
     }).catch((error: unknown) => {
@@ -295,7 +298,12 @@ export function DiffPanel({
   const stagedFiles = useMemo(() => files.filter((file) => file.staged), [files]);
   const unstagedFiles = useMemo(() => files.filter((file) => file.unstaged), [files]);
   const hasStagedFiles = stagedFiles.length > 0;
+  const hasLocalChanges = files.length > 0;
+  const hasUnpushedCommits = syncStatus.hasUpstream && syncStatus.ahead > 0;
+  const canSync = hasUnpushedCommits && !syncBusy && !commitBusy;
   const canCommit = hasStagedFiles && commitMessage.trim().length > 0 && !commitBusy;
+  const showSyncAction = !hasLocalChanges && hasUnpushedCommits;
+  const syncStatusLabel = getSyncStatusLabel(syncStatus, t);
 
   return (
     <aside className="diff-panel" onMouseEnter={() => void refresh()}>
@@ -342,14 +350,19 @@ export function DiffPanel({
             <SparkIcon />
           </button>
         </div>
-        <button
-          className="diff-panel__commit-btn"
-          type="button"
-          onClick={handleCommit}
-          disabled={!canCommit}
-        >
-          {commitBusy ? t("changes.committing") : t("changes.commit")}
-        </button>
+        <div className="diff-panel__commit-action-row">
+          <button
+            className="diff-panel__commit-btn"
+            type="button"
+            onClick={showSyncAction ? handleSync : handleCommit}
+            disabled={showSyncAction ? !canSync : !canCommit}
+          >
+            {showSyncAction
+              ? (syncBusy ? t("changes.syncing") : t("changes.sync"))
+              : (commitBusy ? t("changes.committing") : t("changes.commit"))}
+          </button>
+          {syncStatusLabel ? <div className="diff-panel__sync-status">{syncStatusLabel}</div> : null}
+        </div>
         {errorMessage ? <div className="diff-panel__error">{errorMessage}</div> : null}
       </div>
 
@@ -358,18 +371,6 @@ export function DiffPanel({
           {files.length === 0 ? (
             <div className="diff-panel__empty">
               <span>{t("changes.noChanges")}</span>
-              {showSyncAfterCleanCommit ? (
-                <button
-                  aria-label={t("changes.sync")}
-                  className="diff-panel__sync-btn"
-                  type="button"
-                  onClick={handleSync}
-                  disabled={syncBusy}
-                >
-                  <RefreshIcon />
-                  <span>{syncBusy ? t("changes.syncing") : t("changes.sync")}</span>
-                </button>
-              ) : null}
             </div>
           ) : (
             <>
@@ -424,6 +425,25 @@ export function DiffPanel({
       </div>
     </aside>
   );
+}
+
+function getSyncStatusLabel(
+  status: GitSyncStatus,
+  t: (key: string, values?: Record<string, string | number>) => string,
+): string {
+  if (!status.hasUpstream) {
+    return t("changes.syncStatusNoUpstream");
+  }
+  if (status.ahead > 0 && status.behind > 0) {
+    return t("changes.syncStatusDiverged", { ahead: status.ahead, behind: status.behind });
+  }
+  if (status.ahead > 0) {
+    return t("changes.syncStatusAhead", { count: status.ahead });
+  }
+  if (status.behind > 0) {
+    return t("changes.syncStatusBehind", { count: status.behind });
+  }
+  return t("changes.syncStatusClean");
 }
 
 interface ChangeSectionProps {

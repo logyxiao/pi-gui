@@ -28,6 +28,12 @@ export interface GitCommitEntry {
   readonly refs: readonly string[];
 }
 
+export interface GitSyncStatus {
+  readonly ahead: number;
+  readonly behind: number;
+  readonly hasUpstream: boolean;
+}
+
 export interface GenerateCommitMessageInput {
   readonly workspace: WorkspaceRef;
   readonly driver: PiSdkDriver;
@@ -186,6 +192,24 @@ export function getCommitHistory(workspacePath: string, limit = 24): Promise<Git
         };
       }),
   ).catch(() => []);
+}
+
+export async function getGitSyncStatus(workspacePath: string): Promise<GitSyncStatus> {
+  try {
+    const stdout = await runGitStdout(workspacePath, ["rev-list", "--left-right", "--count", "@{upstream}...HEAD"]);
+    const [behindRaw = "0", aheadRaw = "0"] = stdout.trim().split(/\s+/);
+    return {
+      ahead: Number.parseInt(aheadRaw, 10) || 0,
+      behind: Number.parseInt(behindRaw, 10) || 0,
+      hasUpstream: true,
+    };
+  } catch {
+    return {
+      ahead: 0,
+      behind: 0,
+      hasUpstream: false,
+    };
+  }
 }
 
 function getStagedNameStatus(workspacePath: string): Promise<string> {
