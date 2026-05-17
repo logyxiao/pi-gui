@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ClipboardEvent, type Dispatch, type DragEvent, type KeyboardEvent, type RefObject, type SetStateAction } from "react";
+import { memo, useCallback, useEffect, useMemo, useState, type ClipboardEvent, type Dispatch, type DragEvent, type KeyboardEvent, type RefObject, type SetStateAction } from "react";
 import type { SessionContextUsage } from "@pi-gui/session-driver";
 import type { RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
 import type { ComposerAttachment, QueuedComposerMessage, SessionRecord } from "./desktop-state";
@@ -66,7 +66,7 @@ interface ComposerPanelProps {
   readonly onToggleExtensionDock: () => void;
 }
 
-export function ComposerPanel({
+function ComposerPanelComponent({
   selectedSession,
   lastError,
   runtime,
@@ -121,16 +121,30 @@ export function ComposerPanel({
   const [persistedUsage, setPersistedUsage] = useState<ComposerProviderUsage>({});
   const [refreshingUsage, setRefreshingUsage] = useState(false);
   const [usageError, setUsageError] = useState<string | undefined>();
-  const contextStatus = buildComposerContextStatus(
-    runtime,
-    provider,
-    modelId,
-    selectedSession.preview,
-    composerDraft,
-    t("composer.contextUnknown"),
-    contextUsage,
-    persistedUsage.contextWindow,
-    persistedUsage.balance,
+  const contextUnknownLabel = t("composer.contextUnknown");
+  const contextStatus = useMemo(
+    () => buildComposerContextStatus(
+      runtime,
+      provider,
+      modelId,
+      selectedSession.preview,
+      composerDraft,
+      contextUnknownLabel,
+      contextUsage,
+      persistedUsage.contextWindow,
+      persistedUsage.balance,
+    ),
+    [
+      composerDraft,
+      contextUsage,
+      contextUnknownLabel,
+      modelId,
+      persistedUsage.balance,
+      persistedUsage.contextWindow,
+      provider,
+      runtime,
+      selectedSession.preview,
+    ],
   );
   const submitShortcut = selectedSession.status === "running"
     ? t("composer.sendShortcutRunning")
@@ -344,6 +358,8 @@ export function ComposerPanel({
     </footer>
   );
 }
+
+export const ComposerPanel = memo(ComposerPanelComponent);
 
 interface ComposerContextStatus {
   readonly percent: number;

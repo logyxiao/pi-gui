@@ -1,4 +1,4 @@
-import type { MouseEvent as ReactMouseEvent, Dispatch, SetStateAction } from "react";
+import { memo, type MouseEvent as ReactMouseEvent, type Dispatch, type SetStateAction } from "react";
 import type { AppView, DesktopAppState, SessionRecord, WorkspaceRecord, WorktreeRecord } from "./desktop-state";
 import { DiffIcon, FolderIcon, TerminalIcon } from "./icons";
 import { getDesktopShortcutLabel, type PiDesktopApi } from "./ipc";
@@ -29,7 +29,7 @@ interface TopbarProps {
   readonly onToggleDiffPanel: () => void;
 }
 
-export function Topbar(props: TopbarProps) {
+function TopbarComponent(props: TopbarProps) {
   const {
     activeView,
     rootWorkspace,
@@ -178,3 +178,5 @@ export function Topbar(props: TopbarProps) {
     </header>
   );
 }
+
+export const Topbar = memo(TopbarComponent);

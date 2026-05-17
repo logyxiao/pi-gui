@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type Dispatch, type DragEvent, type KeyboardEvent, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type Dispatch, type DragEvent, type KeyboardEvent, type SetStateAction } from "react";
 import type { SessionTreeSnapshot } from "@pi-gui/session-driver/types";
 import type { RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
 import {
@@ -20,11 +20,8 @@ import { DiffPanel, type DiffPanelFileRequest } from "./diff-panel";
 import { buildModelOptions } from "./composer-commands";
 import { parseTreeComposerCommand } from "./composer-commands";
 import {
-  desktopCommands,
-  getDesktopCommandFromShortcut,
   getDesktopShortcutLabel,
   type DesktopNotificationPermissionStatus,
-  type PiDesktopCommand,
 } from "./ipc";
 import { deriveModelOnboardingState } from "./model-onboarding";
 import { SkillsView } from "./skills-view";
@@ -44,6 +41,8 @@ import { useMentionMenu } from "./hooks/use-mention-menu";
 import { useThreadSearch } from "./hooks/use-thread-search";
 import { useTimelineController } from "./hooks/use-timeline-controller";
 import { useWorkspaceMenu } from "./hooks/use-workspace-menu";
+import { useDesktopCommands } from "./hooks/use-desktop-commands";
+import { useComposerController } from "./hooks/use-composer-controller";
 import { buildExtensionDockModel, ExtensionDialog, hasExtensionDockContent } from "./extension-session-ui";
 import { TreeModal } from "./tree-modal";
 import { ConfirmDialog, type ConfirmDialogProps } from "./confirm-dialog";
@@ -107,11 +106,6 @@ function updateSnapshot(
   });
 }
 
-function isEventInsideTerminal(event: globalThis.KeyboardEvent): boolean {
-  const target = event.target;
-  return target instanceof Element && Boolean(target.closest("[data-pi-terminal]"));
-}
-
 function canTogglePrimarySidebar(view: AppView | undefined): boolean {
   return view === "threads" || view === "new-thread";
 }
@@ -162,7 +156,6 @@ export default function App({
 }) {
   const { t } = useI18n();
   const [snapshot, setSnapshot, selectedTranscript] = useDesktopAppState();
-  const [composerDraft, setComposerDraft] = useState("");
   const [settingsSection, setSettingsSection] = useState<SettingsSection>("general");
   const [settingsWorkspaceId, setSettingsWorkspaceId] = useState("");
   const [pendingNewThreadWorkspaceId, setPendingNewThreadWorkspaceId] = useState("");
@@ -198,8 +191,6 @@ export default function App({
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const newThreadComposerRef = useRef<HTMLTextAreaElement | null>(null);
   const previousActiveViewRef = useRef<AppView | null>(null);
-  const hydratedComposerSessionKeyRef = useRef("");
-  const handledComposerSyncNonceRef = useRef(0);
   const [showDiffPanel, setShowDiffPanel] = useState(false);
   const [openTerminalSessionKeys, setOpenTerminalSessionKeys] = useState<ReadonlySet<string>>(() => new Set());
   const [takeoverTerminalSessionKeys, setTakeoverTerminalSessionKeys] = useState<ReadonlySet<string>>(() => new Set());
@@ -287,8 +278,14 @@ export default function App({
     return undefined;
   }, [refreshNotificationPermissionStatus, settingsSection, snapshot?.activeView]);
 
-  const selectedWorkspace = snapshot ? (getSelectedWorkspace(snapshot) ?? snapshot.workspaces[0]) : undefined;
-  const selectedSession = snapshot ? (getSelectedSession(snapshot) ?? selectedWorkspace?.sessions[0]) : undefined;
+  const selectedWorkspace = useMemo(
+    () => snapshot ? (getSelectedWorkspace(snapshot) ?? snapshot.workspaces[0]) : undefined,
+    [snapshot?.selectedWorkspaceId, snapshot?.workspaces],
+  );
+  const selectedSession = useMemo(
+    () => snapshot ? (getSelectedSession(snapshot) ?? selectedWorkspace?.sessions[0]) : undefined,
+    [selectedWorkspace, snapshot?.selectedSessionId],
+  );
   const {
     activeWorktrees,
     linkedWorktreeByWorkspaceId,
@@ -334,7 +331,7 @@ export default function App({
       rootWorkspaceOptions: nextRootWorkspaceOptions,
       visibleWorkspaces: nextVisibleWorkspaces,
     };
-  }, [selectedWorkspace, snapshot]);
+  }, [selectedWorkspace, snapshot?.workspaces, snapshot?.worktreesByWorkspace]);
   const selectedRuntime = selectedWorkspace ? snapshot?.runtimeByWorkspace[selectedWorkspace.id] : undefined;
   const selectedModelRuntime = snapshot ? getEffectiveModelRuntime(snapshot, selectedWorkspace) : undefined;
   const selectedWorktree = selectedWorkspace ? linkedWorktreeByWorkspaceId.get(selectedWorkspace.id) : undefined;
@@ -419,6 +416,13 @@ export default function App({
     showJumpToLatest,
     timelinePaneRef,
   } = timelineController;
+  const { composerDraft, setComposerDraft } = useComposerController({
+    api,
+    composerRef,
+    onComposerHeightChange: handleComposerHeightChange,
+    selectedSessionKey,
+    snapshot,
+  });
   const threadSearch = useThreadSearch(timelinePaneRef);
   useEffect(() => {
     if (snapshot && snapshot.workspaces.length === 0) {
@@ -430,16 +434,15 @@ export default function App({
   const displayedSessionTitle = selectedExtensionUi?.title ?? selectedSession?.title ?? "";
   const activeExtensionDialog = selectedExtensionUi?.pendingDialogs[0];
   const isSelectedExtensionDockExpanded = dockExpandedBySession[selectedSessionKey] ?? false;
-  const persistedComposerDraft = snapshot?.composerDraft ?? "";
   const threadGroups = useMemo(
     () => (snapshot ? buildThreadGroups(snapshot) : []),
     [snapshot?.workspaces, snapshot?.worktreesByWorkspace, snapshot?.workspaceOrder],
   );
-  const focusComposer = () => {
+  const focusComposer = useCallback(() => {
     window.requestAnimationFrame(() => {
       composerRef.current?.focus();
     });
-  };
+  }, []);
   const toggleTerminal = useCallback(() => {
     if (!selectedSessionKey) {
       return;
@@ -459,11 +462,11 @@ export default function App({
     }
     setOpenTerminalSessionKeys((current) => new Set(current).add(selectedSessionKey));
   }, [openTerminalSessionKeys, selectedSessionKey]);
-  const focusNewThreadComposer = () => {
+  const focusNewThreadComposer = useCallback(() => {
     window.requestAnimationFrame(() => {
       newThreadComposerRef.current?.focus();
     });
-  };
+  }, []);
   const updateNewThreadPrompt = useCallback((value: SetStateAction<string>) => {
     setNewThreadComposerError(undefined);
     setNewThreadPrompt(value);
@@ -479,7 +482,7 @@ export default function App({
     setShowDiffPanel((prev) => !prev);
   }, [preserveBottomForLayoutChange]);
 
-  const openSettings = (workspaceId?: string, section?: SettingsSection) => {
+  const openSettings = useCallback((workspaceId?: string, section?: SettingsSection) => {
     if (!api) {
       return;
     }
@@ -494,7 +497,7 @@ export default function App({
       setSettingsSection(section);
     }
     void updateSnapshot(api, setSnapshot, () => api.setActiveView("settings"));
-  };
+  }, [api, rootWorkspaceOptions, settingsWorkspace?.id]);
 
   const closeTreeModal = useCallback(() => {
     setTreeModalState((current) =>
@@ -665,35 +668,6 @@ export default function App({
   });
 
   useEffect(() => {
-    if (!snapshot) {
-      return;
-    }
-
-    if (hydratedComposerSessionKeyRef.current !== selectedSessionKey) {
-      hydratedComposerSessionKeyRef.current = selectedSessionKey;
-      handledComposerSyncNonceRef.current = snapshot.composerDraftSyncNonce;
-      setComposerDraft(snapshot.composerDraft);
-      return;
-    }
-
-    if (snapshot.composerDraftSyncNonce === handledComposerSyncNonceRef.current) {
-      return;
-    }
-
-    handledComposerSyncNonceRef.current = snapshot.composerDraftSyncNonce;
-    if (snapshot.composerDraftSyncSource === "persist" || snapshot.composerDraftSyncSource === "state") {
-      return;
-    }
-
-    setComposerDraft(snapshot.composerDraft);
-  }, [
-    selectedSessionKey,
-    snapshot?.composerDraft,
-    snapshot?.composerDraftSyncNonce,
-    snapshot?.composerDraftSyncSource,
-  ]);
-
-  useEffect(() => {
     const sessionExtensionUiBySession = snapshot?.sessionExtensionUiBySession;
     if (!sessionExtensionUiBySession) {
       setDockExpandedBySession((current) => (Object.keys(current).length > 0 ? {} : current));
@@ -747,7 +721,7 @@ export default function App({
     setPendingNewThreadWorkspaceId("");
   }, [pendingNewThreadWorkspaceId, rootWorkspaceOptions, snapshot]);
 
-  const resetNewThreadSurface = (workspaceId?: string) => {
+  const resetNewThreadSurface = useCallback((workspaceId?: string) => {
     const nextWorkspaceId =
       (workspaceId && (
         rootWorkspaceOptions.find((workspace) => workspace.id === workspaceId)?.id ||
@@ -766,7 +740,7 @@ export default function App({
     setNewThreadModelId(undefined);
     setNewThreadThinkingLevel(undefined);
     setNewThreadComposerError(undefined);
-  };
+  }, [rootWorkspace?.id, rootWorkspaceOptions, snapshot?.workspaces, visibleWorkspaces]);
 
   const primarySidebarToggleVisible = canTogglePrimarySidebar(snapshot?.activeView);
   const handleTogglePrimarySidebar = useCallback(() => {
@@ -780,85 +754,81 @@ export default function App({
   }, []);
   const sidebarToggleShortcutLabel = api ? getDesktopShortcutLabel(api.platform, "B") : "";
 
-  useEffect(() => {
-    const handleCommand = (command: PiDesktopCommand): boolean => {
-      if (command === desktopCommands.openSettings) {
-        openSettings(selectedWorkspace?.rootWorkspaceId ?? selectedWorkspace?.id);
-        return true;
-      } else if (command === desktopCommands.openNewThread) {
-        openNewThreadSurface(selectedWorkspace?.rootWorkspaceId ?? selectedWorkspace?.id);
-        return true;
-      } else if (command === desktopCommands.toggleTerminal) {
-        toggleTerminal();
-        return true;
-      } else if (command === desktopCommands.toggleSidebar) {
-        return handleTogglePrimarySidebar();
-      }
-      return false;
-    };
+  const setActiveView = useCallback((view: AppView) => {
+    if (!api) {
+      return;
+    }
+    void updateSnapshot(api, setSnapshot, () => api.setActiveView(view));
+  }, [api]);
 
-    const removeCommandListener = window.piApp?.onCommand?.(handleCommand);
-    const removeWorkspacePickedListener = window.piApp?.onWorkspacePicked?.((workspaceId) => {
-      setPendingNewThreadWorkspaceId(workspaceId);
-      resetNewThreadSurface();
-    });
-    const removeClipboardImageListener = window.piApp?.onClipboardImagePasted?.(handlePastedClipboardImage);
-    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (isEventInsideTerminal(event)) {
-        const command = getDesktopCommandFromShortcut({
-          modifier: event.metaKey || event.ctrlKey,
-          shift: event.shiftKey,
-          key: event.key,
-          code: event.code,
-        });
-        if (command === desktopCommands.toggleTerminal) {
-          event.preventDefault();
-          handleCommand(command);
-        }
+  const openNewThreadSurface = useCallback((workspaceId?: string) => {
+    setPendingNewThreadWorkspaceId("");
+    resetNewThreadSurface(workspaceId);
+    setActiveView("new-thread");
+  }, [resetNewThreadSurface, setActiveView]);
+
+  const openNewThreadForSelectedWorkspace = useCallback(() => {
+    openNewThreadSurface(selectedWorkspace?.rootWorkspaceId ?? selectedWorkspace?.id);
+  }, [openNewThreadSurface, selectedWorkspace?.id, selectedWorkspace?.rootWorkspaceId]);
+
+  const handlePastedClipboardImage = useCallback((clipboardImage: ComposerImageAttachment) => {
+    const activeElement = document.activeElement;
+    if (activeElement === composerRef.current) {
+      if (!api) {
         return;
       }
-      // Cmd+F toggles thread search
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f" && !event.shiftKey) {
-        event.preventDefault();
-        if (threadSearch.isOpen) {
-          threadSearch.close();
-        } else {
-          threadSearch.open();
-        }
-        return;
-      }
-      // Cmd+D toggles diff panel
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "d" && !event.shiftKey) {
-        event.preventDefault();
-        toggleDiffPanel();
-        return;
-      }
-      const command = getDesktopCommandFromShortcut({
-        modifier: event.metaKey || event.ctrlKey,
-        shift: event.shiftKey,
-        key: event.key,
-        code: event.code,
-      });
-      if (command && handleCommand(command)) {
-        event.preventDefault();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      removeCommandListener?.();
-      removeWorkspacePickedListener?.();
-      removeClipboardImageListener?.();
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [
-    selectedWorkspace?.id,
-    selectedWorkspace?.rootWorkspaceId,
-    threadSearch,
+      void updateSnapshot(api, setSnapshot, () => api.addComposerAttachments([clipboardImage]));
+      return;
+    }
+
+    if (activeElement === newThreadComposerRef.current) {
+      setNewThreadAttachments((current) => [...current, clipboardImage]);
+    }
+  }, [api]);
+
+  const handleWorkspacePicked = useCallback((workspaceId: string) => {
+    setPendingNewThreadWorkspaceId(workspaceId);
+    resetNewThreadSurface();
+  }, [resetNewThreadSurface]);
+
+  const openSettingsForSelectedWorkspace = useCallback(() => {
+    openSettings(selectedWorkspace?.rootWorkspaceId ?? selectedWorkspace?.id);
+  }, [openSettings, selectedWorkspace?.id, selectedWorkspace?.rootWorkspaceId]);
+
+  useDesktopCommands({
     api,
-    toggleDiffPanel,
-    toggleTerminal,
-    handleTogglePrimarySidebar,
-  ]);
+    threadSearch,
+    onOpenSettings: openSettingsForSelectedWorkspace,
+    onOpenNewThread: openNewThreadForSelectedWorkspace,
+    onToggleTerminal: toggleTerminal,
+    onToggleSidebar: handleTogglePrimarySidebar,
+    onToggleDiffPanel: toggleDiffPanel,
+    onWorkspacePicked: handleWorkspacePicked,
+    onClipboardImagePasted: handlePastedClipboardImage,
+  });
+
+  const handleArchiveSession = useCallback((target: { workspaceId: string; sessionId: string }) => {
+    if (!api) {
+      return;
+    }
+    void updateSnapshot(api, setSnapshot, () => api.archiveSession(target));
+  }, [api]);
+
+  const handleSelectSession = useCallback((target: { workspaceId: string; sessionId: string }) => {
+    if (!api) {
+      return;
+    }
+    void updateSnapshot(api, setSnapshot, () => api.selectSession(target)).then(() => {
+      focusComposer();
+    });
+  }, [api, focusComposer]);
+
+  const handleUnarchiveSession = useCallback((target: { workspaceId: string; sessionId: string }) => {
+    if (!api) {
+      return;
+    }
+    void updateSnapshot(api, setSnapshot, () => api.unarchiveSession(target));
+  }, [api]);
 
   useEffect(() => {
     setTreeModalState((current) =>
@@ -899,37 +869,6 @@ export default function App({
 
     previousActiveViewRef.current = snapshot.activeView;
   }, [preserveBottomForLayoutChange, resetForNonThreadView, selectedSession, selectedWorkspace?.id, snapshot]);
-
-  useEffect(() => {
-    if (!api || composerDraft === persistedComposerDraft) {
-      return undefined;
-    }
-
-    const timeout = window.setTimeout(() => {
-      void api.updateComposerDraft(composerDraft);
-    }, 350);
-
-    return () => {
-      window.clearTimeout(timeout);
-    };
-  }, [api, composerDraft, persistedComposerDraft, setSnapshot]);
-
-  useLayoutEffect(() => {
-    const composer = composerRef.current;
-    if (!composer) {
-      return undefined;
-    }
-
-    const previousHeight = composer.getBoundingClientRect().height;
-
-    composer.style.height = "0px";
-    composer.style.height = `${Math.min(composer.scrollHeight, 220)}px`;
-
-    const nextHeight = composer.getBoundingClientRect().height;
-    if (Math.abs(nextHeight - previousHeight) >= 1) {
-      handleComposerHeightChange();
-    }
-  }, [composerDraft, handleComposerHeightChange]);
 
   if (!api || !snapshot) {
     return (
@@ -990,16 +929,6 @@ export default function App({
       }}
     />
   ) : null;
-
-  const setActiveView = (view: AppView) => {
-    void updateSnapshot(api, setSnapshot, () => api.setActiveView(view));
-  };
-
-  const openNewThreadSurface = (workspaceId?: string) => {
-    setPendingNewThreadWorkspaceId("");
-    resetNewThreadSurface(workspaceId);
-    setActiveView("new-thread");
-  };
 
   const handleSelectNewThreadWorkspace = (workspaceId: string) => {
     setPendingNewThreadWorkspaceId("");
@@ -1169,21 +1098,6 @@ export default function App({
     return true;
   };
 
-  function handlePastedClipboardImage(clipboardImage: ComposerImageAttachment) {
-    const activeElement = document.activeElement;
-    if (activeElement === composerRef.current) {
-      if (!api) {
-        return;
-      }
-      void updateSnapshot(api, setSnapshot, () => api.addComposerAttachments([clipboardImage]));
-      return;
-    }
-
-    if (activeElement === newThreadComposerRef.current) {
-      setNewThreadAttachments((current) => [...current, clipboardImage]);
-    }
-  }
-
   const handleSetSessionModel = (provider: string, modelId: string) => {
     if (!selectedWorkspace || !selectedSession) {
       return;
@@ -1349,16 +1263,6 @@ export default function App({
       });
   };
 
-  const handleArchiveSession = (target: { workspaceId: string; sessionId: string }) => {
-    void updateSnapshot(api, setSnapshot, () => api.archiveSession(target));
-  };
-
-  const handleSelectSession = (target: { workspaceId: string; sessionId: string }) => {
-    void updateSnapshot(api, setSnapshot, () => api.selectSession(target)).then(() => {
-      focusComposer();
-    });
-  };
-
   const handleRespondToExtensionDialog = (
     response:
       | { readonly requestId: string; readonly value: string }
@@ -1385,10 +1289,6 @@ export default function App({
       ...current,
       [selectedSessionKey]: !(current[selectedSessionKey] ?? false),
     }));
-  };
-
-  const handleUnarchiveSession = (target: { workspaceId: string; sessionId: string }) => {
-    void updateSnapshot(api, setSnapshot, () => api.unarchiveSession(target));
   };
 
   const handleStartThread = () => {
@@ -1607,7 +1507,7 @@ export default function App({
           sidebarToggleVisible={primarySidebarToggleVisible}
           sidebarToggleShortcutLabel={sidebarToggleShortcutLabel}
           onToggleSidebar={handleTogglePrimarySidebar}
-          onNewThread={() => openNewThreadSurface(selectedWorkspace?.rootWorkspaceId ?? selectedWorkspace?.id)}
+          onNewThread={openNewThreadForSelectedWorkspace}
           onOpenSettings={openSettings}
           onArchiveSession={handleArchiveSession}
           onSelectSession={handleSelectSession}
@@ -1811,7 +1711,7 @@ export default function App({
                 <button
                   className="button button--primary"
                   type="button"
-                  onClick={() => openNewThreadSurface(selectedWorkspace?.rootWorkspaceId ?? selectedWorkspace?.id)}
+                  onClick={openNewThreadForSelectedWorkspace}
                 >
                   {t("sidebar.newThread")}
                 </button>

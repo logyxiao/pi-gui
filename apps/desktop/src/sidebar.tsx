@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -49,7 +49,7 @@ interface SidebarProps {
   readonly onUnarchiveSession: (target: { workspaceId: string; sessionId: string }) => void;
 }
 
-export function Sidebar(props: SidebarProps) {
+function SidebarComponent(props: SidebarProps) {
   const {
     activeView,
     selectedWorkspace,
@@ -255,6 +255,8 @@ export function Sidebar(props: SidebarProps) {
     </aside>
   );
 }
+
+export const Sidebar = memo(SidebarComponent);
 
 /* ── Sortable workspace group wrapper ──────────────────── */
 

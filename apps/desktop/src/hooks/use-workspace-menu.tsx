@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type Dispatch, type MouseEvent as ReactMouseEvent, type RefObject, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type MouseEvent as ReactMouseEvent, type RefObject, type SetStateAction } from "react";
 import type { DesktopAppState, WorkspaceRecord, WorktreeRecord } from "../desktop-state";
 import type { PiDesktopApi } from "../ipc";
 import type { ConfirmDialogProps } from "../confirm-dialog";
@@ -102,21 +102,21 @@ export function useWorkspaceMenu(params: UseWorkspaceMenuParams): WorkspaceMenuS
     };
   }, []);
 
-  const openWorkspaceMenu = (workspaceId: string) => {
+  const openWorkspaceMenu = useCallback((workspaceId: string) => {
     setWorkspaceMenuId((current) => (current === workspaceId ? null : workspaceId));
-  };
+  }, []);
 
-  const closeWorkspaceMenu = () => {
+  const closeWorkspaceMenu = useCallback(() => {
     setWorkspaceMenuId(null);
-  };
+  }, []);
 
-  const startRename = (workspace: WorkspaceRecord) => {
+  const startRename = useCallback((workspace: WorkspaceRecord) => {
     setWorkspaceMenuId(null);
     setWorkspaceRenameId(workspace.id);
     setWorkspaceRenameDraft(workspace.name);
-  };
+  }, []);
 
-  const submitRename = (workspace: WorkspaceRecord) => {
+  const submitRename = useCallback((workspace: WorkspaceRecord) => {
     const nextName = workspaceRenameDraft.trim();
     setWorkspaceMenuId(null);
     setWorkspaceRenameId(null);
@@ -129,14 +129,14 @@ export function useWorkspaceMenu(params: UseWorkspaceMenuParams): WorkspaceMenuS
       return;
     }
     void updateSnapshot(api, setSnapshot, () => api.renameWorkspace(workspace.id, nextName));
-  };
+  }, [api, setSnapshot, updateSnapshot, workspaceRenameDraft]);
 
-  const cancelRename = () => {
+  const cancelRename = useCallback(() => {
     setWorkspaceRenameId(null);
     setWorkspaceRenameDraft("");
-  };
+  }, []);
 
-  const removeWorkspace = (workspace: WorkspaceRecord) => {
+  const removeWorkspace = useCallback((workspace: WorkspaceRecord) => {
     setWorkspaceMenuId(null);
     setWorkspaceRenameId(null);
     if (!api) {
@@ -153,24 +153,24 @@ export function useWorkspaceMenu(params: UseWorkspaceMenuParams): WorkspaceMenuS
       }
       void updateSnapshot(api, setSnapshot, () => api.removeWorkspace(workspace.id));
     });
-  };
+  }, [api, requestConfirm, setSnapshot, t, updateSnapshot]);
 
-  const toggleArchived = (workspaceId: string, open: boolean) => {
+  const toggleArchived = useCallback((workspaceId: string, open: boolean) => {
     setExpandedArchivedByWorkspace((current) => ({ ...current, [workspaceId]: open }));
-  };
+  }, []);
 
-  const toggleWorkspaceCollapsed = (workspaceId: string) => {
+  const toggleWorkspaceCollapsed = useCallback((workspaceId: string) => {
     setCollapsedWorkspaces((current) => ({ ...current, [workspaceId]: !current[workspaceId] }));
-  };
+  }, []);
 
-  const expandWorkspace = (workspaceId: string) => {
+  const expandWorkspace = useCallback((workspaceId: string) => {
     setCollapsedWorkspaces((current) => {
       if (!current[workspaceId]) return current;
       return { ...current, [workspaceId]: false };
     });
-  };
+  }, []);
 
-  const createWorktree = (workspaceId: string, fromSessionWorkspaceId?: string, fromSessionId?: string) => {
+  const createWorktree = useCallback((workspaceId: string, fromSessionWorkspaceId?: string, fromSessionId?: string) => {
     setWorkspaceMenuId(null);
     setEnvironmentMenuOpen(false);
     if (!api) {
@@ -179,9 +179,9 @@ export function useWorkspaceMenu(params: UseWorkspaceMenuParams): WorkspaceMenuS
     void updateSnapshot(api, setSnapshot, () =>
       api.createWorktree({ workspaceId, fromSessionWorkspaceId, fromSessionId }),
     );
-  };
+  }, [api, setSnapshot, updateSnapshot]);
 
-  const removeWorktree = (workspaceId: string, worktree: WorktreeRecord) => {
+  const removeWorktree = useCallback((workspaceId: string, worktree: WorktreeRecord) => {
     setEnvironmentMenuOpen(false);
     if (!api) {
       return;
@@ -199,17 +199,17 @@ export function useWorkspaceMenu(params: UseWorkspaceMenuParams): WorkspaceMenuS
         api.removeWorktree({ workspaceId, worktreeId: worktree.id }),
       );
     });
-  };
+  }, [api, requestConfirm, setSnapshot, t, updateSnapshot]);
 
-  const selectWorkspace = (workspaceId: string) => {
+  const selectWorkspace = useCallback((workspaceId: string) => {
     setEnvironmentMenuOpen(false);
     if (!api) {
       return;
     }
     void updateSnapshot(api, setSnapshot, () => api.selectWorkspace(workspaceId));
-  };
+  }, [api, setSnapshot, updateSnapshot]);
 
-  const runWorkspaceMenuAction = (
+  const runWorkspaceMenuAction = useCallback((
     event: ReactMouseEvent<HTMLElement>,
     action: () => void,
   ) => {
@@ -217,9 +217,9 @@ export function useWorkspaceMenu(params: UseWorkspaceMenuParams): WorkspaceMenuS
     event.stopPropagation();
     setWorkspaceMenuId(null);
     action();
-  };
+  }, []);
 
-  return {
+  return useMemo(() => ({
     workspaceMenuId,
     workspaceRenameId,
     workspaceRenameDraft,
@@ -245,5 +245,25 @@ export function useWorkspaceMenu(params: UseWorkspaceMenuParams): WorkspaceMenuS
     removeWorktree,
     selectWorkspace,
     runWorkspaceMenuAction,
-  };
+  }), [
+    cancelRename,
+    closeWorkspaceMenu,
+    collapsedWorkspaces,
+    createWorktree,
+    environmentMenuOpen,
+    expandedArchivedByWorkspace,
+    expandWorkspace,
+    openWorkspaceMenu,
+    removeWorkspace,
+    removeWorktree,
+    runWorkspaceMenuAction,
+    selectWorkspace,
+    startRename,
+    submitRename,
+    toggleArchived,
+    toggleWorkspaceCollapsed,
+    workspaceMenuId,
+    workspaceRenameDraft,
+    workspaceRenameId,
+  ]);
 }
