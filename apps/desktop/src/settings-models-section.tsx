@@ -117,6 +117,7 @@ export function SettingsModelsSection({
 function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime?: () => void }) {
   const { t } = useI18n();
   const [modelsJson, setModelsJson] = useState<ModelsJsonFile>({ providers: {} });
+  const [savedSnapshot, setSavedSnapshot] = useState<string>(JSON.stringify({ providers: {} }));
   const [selectedProviderId, setSelectedProviderId] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -128,6 +129,16 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
   const [balanceDialogOpen, setBalanceDialogOpen] = useState(false);
   const [balanceBaseUrlDraft, setBalanceBaseUrlDraft] = useState("");
   const [balanceApiKeyDraft, setBalanceApiKeyDraft] = useState("");
+  const isDirty = useMemo(() => JSON.stringify(modelsJson) !== savedSnapshot, [modelsJson, savedSnapshot]);
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = t("settings.models.unsavedBeforeUnload");
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty, t]);
   const providerIds = useMemo(() => Object.keys(modelsJson.providers).sort((a, b) => a.localeCompare(b)), [modelsJson]);
   const filteredProviderIds = useMemo(() => {
     const query = providerQuery.trim().toLowerCase();
@@ -166,6 +177,7 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
         if (cancelled) return;
         const ids = Object.keys(file.providers).sort((a, b) => a.localeCompare(b));
         setModelsJson(file);
+        setSavedSnapshot(JSON.stringify(file));
         setSelectedProviderId((current) => current || ids[0] || "");
         setStatus({ kind: "ok", text: t("settings.models.loadedProviders", { count: ids.length }) });
       } catch (error) {
@@ -296,6 +308,7 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
     try {
       const result = await window.piApp.writeModelsJson(modelsJson);
       const patterns = await window.piApp.syncEnabledModels(modelsJson);
+      setSavedSnapshot(JSON.stringify(modelsJson));
       onRefreshRuntime?.();
       setStatus({ kind: "ok", text: t("settings.models.saved", { providers: result.providerCount, models: result.modelCount, patterns: patterns.length }) });
     } catch (error) {
@@ -350,6 +363,20 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
     };
     try {
       await window.piApp.writeModelsJson(nextModelsJson);
+      setSavedSnapshot((current) => {
+        const baseline = current ? safeParseSnapshot(current) : modelsJson;
+        const merged: ModelsJsonFile = {
+          providers: {
+            ...baseline.providers,
+            [providerId]: {
+              ...(baseline.providers[providerId] ?? {}),
+              usageLastValue,
+              usageLastCheckedAt,
+            },
+          },
+        };
+        return JSON.stringify(merged);
+      });
       onRefreshRuntime?.();
     } catch (error) {
       setStatus({ kind: "error", text: describeError(error, t) });
@@ -373,6 +400,7 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
       const file = await window.piApp.readModelsJson();
       const ids = Object.keys(file.providers).sort((a, b) => a.localeCompare(b));
       setModelsJson(file);
+      setSavedSnapshot(JSON.stringify(file));
       setSelectedProviderId((current) => current && file.providers[current] ? current : ids[0] ?? "");
       onRefreshRuntime?.();
       setStatus({ kind: "ok", text: t("settings.models.syncedCcSwitch", { providers: result.importedProviderCount, models: result.importedModelCount, patterns: result.syncedPatternCount }) });
@@ -387,9 +415,10 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
     <SettingsGroup title={t("settings.models.advanced")} description={t("settings.models.advancedDescription")}>
       <div className="model-manager__toolbar">
         <div className="settings-row__actions model-manager__toolbar-actions">
-          <button className="button button--secondary model-manager__strong-button" disabled={loading} type="button" onClick={() => window.piApp?.readModelsJson().then((file) => setModelsJson(file)).catch((error) => setStatus({ kind: "error", text: describeError(error, t) }))}>{t("settings.models.reload")}</button>
+          {isDirty ? <span className="model-manager__dirty-badge">{t("settings.models.unsavedBadge")}</span> : null}
+          <button className="button button--secondary model-manager__strong-button" disabled={loading} type="button" onClick={() => window.piApp?.readModelsJson().then((file) => { setModelsJson(file); setSavedSnapshot(JSON.stringify(file)); }).catch((error) => setStatus({ kind: "error", text: describeError(error, t) }))}>{t("settings.models.reload")}</button>
           <button className="button button--secondary model-manager__strong-button" disabled={saving} type="button" onClick={() => void syncCcSwitch()}>{t("settings.models.syncCcSwitch")}</button>
-          <button className="button button--primary" disabled={saving} type="button" onClick={() => void save()}>{saving ? t("settings.models.saving") : t("settings.models.saveSync")}</button>
+          <button className="button button--primary" disabled={saving || !isDirty} type="button" onClick={() => void save()}>{saving ? t("settings.models.saving") : t("settings.models.saveSync")}</button>
         </div>
       </div>
       {status ? <div className={`model-manager__status model-manager__status--${status.kind}`}>{status.text}</div> : null}
