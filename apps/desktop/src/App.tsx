@@ -1391,8 +1391,6 @@ export default function App({
           workspaces={snapshot.workspaces}
           wsMenu={wsMenu}
           api={api}
-          setSnapshot={setSnapshot}
-          updateSnapshot={updateSnapshot}
           terminalAvailable={Boolean(selectedSessionKey)}
           terminalVisible={isTerminalVisibleForSelectedThread}
           onToggleTerminal={toggleTerminal}
