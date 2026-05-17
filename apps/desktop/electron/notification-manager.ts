@@ -8,6 +8,7 @@ import { sessionKey } from "@pi-gui/pi-sdk-driver";
 import type { SessionDriverEvent, SessionRef } from "@pi-gui/session-driver";
 import { getSelectedSession } from "../src/desktop-state";
 import { isSessionActivelyViewed } from "./session-visibility";
+import { tMain } from "./main-i18n";
 
 export class NotificationManager {
   private readonly completedRunKeys = new Set<string>();
@@ -121,7 +122,7 @@ export class NotificationManager {
         return;
       }
       this.completedRunKeys.add(dedupeKey);
-      await this.showNotification(event.sessionRef, event.snapshot.title, "Agent finished responding");
+      await this.showNotification(event.sessionRef, event.snapshot.title, tMain("main.notification.runCompleted"));
       return;
     }
 
@@ -333,7 +334,7 @@ export class NotificationManager {
   }
 
   private titleForSession(sessionRef: SessionRef): string {
-    return this.sessionFromLatestState(sessionRef)?.title ?? "pi session";
+    return this.sessionFromLatestState(sessionRef)?.title ?? tMain("main.notification.sessionFallback");
   }
 }
 
@@ -345,7 +346,7 @@ function hostUiBody(event: Extract<SessionDriverEvent, { type: "hostUiRequest" }
   if (event.request.kind === "confirm" || event.request.kind === "input" || event.request.kind === "select") {
     return event.request.title;
   }
-  return "Needs your input";
+  return tMain("main.notification.needsInput");
 }
 
 function sameSessionRef(left: SessionRef | undefined, right: SessionRef | undefined): boolean {

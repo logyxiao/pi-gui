@@ -1,4 +1,17 @@
 import {
+  assertApiKey,
+  assertCommitMessage,
+  assertHostUiResponse,
+  assertModelsJson,
+  assertNonEmptyString,
+  assertNotificationPreferences,
+  assertProviderId,
+  assertProviderInput,
+  assertString,
+  assertWorkspaceId,
+} from "./ipc-validators";
+import { setMainLanguage, tMain } from "./main-i18n";
+import {
   app,
   BrowserWindow,
   clipboard,
@@ -156,12 +169,13 @@ function readClipboardImageAttachment(): ComposerImageAttachment | null {
 
 function createWindow(): BrowserWindow {
   const backgroundTestMode = windowTestMode === "background";
+  const initialBackground = themeManager.getResolvedTheme() === "dark" ? "#1f2024" : "#f3f4f8";
   const window = new BrowserWindow({
     width: 1480,
     height: 980,
     minWidth: 1200,
     minHeight: 760,
-    backgroundColor: "#f3f4f8",
+    backgroundColor: initialBackground,
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 18, y: 18 },
     show: false,
@@ -322,11 +336,11 @@ async function pickWorkspaceViaDialog(): Promise<DesktopAppState> {
   const result = window
     ? await dialog.showOpenDialog(window, {
         properties: ["openDirectory"],
-        title: "Open workspace folder",
+        title: tMain("main.menu.openWorkspaceFolder"),
       })
     : await dialog.showOpenDialog({
         properties: ["openDirectory"],
-        title: "Open workspace folder",
+        title: tMain("main.menu.openWorkspaceFolder"),
       });
   if (result.canceled || result.filePaths.length === 0) {
     return store.getState();
@@ -354,9 +368,9 @@ async function runManualUpdateCheck(): Promise<void> {
   if (result.status === "up-to-date") {
     const options: MessageBoxOptions = {
       type: "info",
-      title: "pi-gui",
-      message: `You're up to date on version ${result.currentVersion}.`,
-      buttons: ["OK"],
+      title: tMain("main.update.upToDateTitle"),
+      message: tMain("main.update.upToDateMessage", { version: result.currentVersion }),
+      buttons: [tMain("main.dialog.ok")],
     };
     if (window) {
       await dialog.showMessageBox(window, options);
@@ -368,10 +382,10 @@ async function runManualUpdateCheck(): Promise<void> {
 
   const options: MessageBoxOptions = {
     type: "warning",
-    title: "pi-gui",
-    message: "Could not check for updates right now.",
+    title: tMain("main.update.checkFailedTitle"),
+    message: tMain("main.update.checkFailedMessage"),
     detail: result.message,
-    buttons: ["OK"],
+    buttons: [tMain("main.dialog.ok")],
   };
   if (window) {
     await dialog.showMessageBox(window, options);
@@ -457,6 +471,7 @@ app.whenReady().then(async () => {
     return;
   }
   languageMode = await resolveInitialLanguageMode();
+  setMainLanguage(languageMode);
 
   // On macOS, packaged builds already render the dock icon from `icon.icns`
   // in the app bundle. In dev we override the generic Electron dock icon with
@@ -556,6 +571,7 @@ app.whenReady().then(async () => {
   registerRendererIpc(desktopIpc.getLanguage, () => languageMode);
   registerRendererIpc(desktopIpc.setLanguage, async (_event, language: LanguageMode) => {
     languageMode = normalizeLanguageMode(language) ?? "en";
+    setMainLanguage(languageMode);
     await writeLanguagePreference(languageMode);
     return languageMode;
   });
@@ -626,8 +642,12 @@ app.whenReady().then(async () => {
   registerRendererIpc(desktopIpc.logoutProvider, (_event, workspaceId: string, providerId: string) =>
     store.logoutProvider(workspaceId, providerId),
   );
-  registerRendererIpc(desktopIpc.setProviderApiKey, (_event, workspaceId: string, providerId: string, apiKey: string) =>
-    store.setProviderApiKey(workspaceId, providerId, apiKey),
+  registerRendererIpc(desktopIpc.setProviderApiKey, (_event, workspaceId, providerId, apiKey) =>
+    store.setProviderApiKey(
+      assertWorkspaceId(workspaceId),
+      assertProviderId(providerId),
+      assertApiKey(apiKey),
+    ),
   );
   registerRendererIpc(desktopIpc.setEnableSkillCommands, (_event, workspaceId: string, enabled: boolean) =>
     store.setEnableSkillCommands(workspaceId, enabled),
@@ -641,21 +661,24 @@ app.whenReady().then(async () => {
   registerRendererIpc(desktopIpc.setExtensionEnabled, (_event, workspaceId: string, filePath: string, enabled: boolean) =>
     store.setExtensionEnabled(workspaceId, filePath, enabled),
   );
-  registerRendererIpc(desktopIpc.respondToHostUiRequest, (_event, workspaceId: string, sessionId: string, response) =>
-    store.respondToHostUiRequest({ workspaceId, sessionId }, response),
+  registerRendererIpc(desktopIpc.respondToHostUiRequest, (_event, workspaceId, sessionId, response) =>
+    store.respondToHostUiRequest(
+      { workspaceId: assertWorkspaceId(workspaceId), sessionId: assertNonEmptyString(sessionId, "sessionId", 1024) },
+      assertHostUiResponse(response),
+    ),
   );
   registerRendererIpc(desktopIpc.setNotificationPreferences, (_event, preferences) =>
-    store.setNotificationPreferences(preferences),
+    store.setNotificationPreferences(assertNotificationPreferences(preferences)),
   );
-  registerRendererIpc(desktopIpc.setIntegratedTerminalShell, (_event, shellPath: string) =>
-    store.setIntegratedTerminalShell(shellPath),
+  registerRendererIpc(desktopIpc.setIntegratedTerminalShell, (_event, shellPath) =>
+    store.setIntegratedTerminalShell(assertString(shellPath, "integratedTerminalShell", 4096)),
   );
   registerRendererIpc(desktopIpc.readModelsJson, async () => readModelsJson());
-  registerRendererIpc(desktopIpc.writeModelsJson, async (_event, modelsJson) => writeModelsJson(modelsJson));
-  registerRendererIpc(desktopIpc.fetchProviderModels, async (_event, provider) => fetchProviderModels(provider));
-  registerRendererIpc(desktopIpc.testProvider, async (_event, provider) => testProvider(provider));
-  registerRendererIpc(desktopIpc.probeProvider, async (_event, provider) => probeProvider(provider));
-  registerRendererIpc(desktopIpc.syncEnabledModels, async (_event, modelsJson) => syncEnabledModelsToSettings(modelsJson));
+  registerRendererIpc(desktopIpc.writeModelsJson, async (_event, modelsJson) => writeModelsJson(assertModelsJson(modelsJson)));
+  registerRendererIpc(desktopIpc.fetchProviderModels, async (_event, provider) => fetchProviderModels(assertProviderInput(provider)));
+  registerRendererIpc(desktopIpc.testProvider, async (_event, provider) => testProvider(assertProviderInput(provider)));
+  registerRendererIpc(desktopIpc.probeProvider, async (_event, provider) => probeProvider(assertProviderInput(provider)));
+  registerRendererIpc(desktopIpc.syncEnabledModels, async (_event, modelsJson) => syncEnabledModelsToSettings(assertModelsJson(modelsJson)));
   registerRendererIpc(desktopIpc.syncCcSwitchProviders, async () => syncCcSwitchProviders());
   registerRendererIpc(desktopIpc.terminalEnsurePanel, (event, workspaceId: string, terminalScopeId: string, size) => {
     return getTerminalService().ensurePanel(event.sender, workspaceId, terminalScopeId, size);
@@ -811,12 +834,14 @@ app.whenReady().then(async () => {
     }
     await unstageAllFiles(workspacePath);
   });
-  registerRendererIpc(desktopIpc.commitStagedChanges, async (_event, workspaceId: string, message: string) => {
-    const workspacePath = store.getWorkspacePath(workspaceId);
+  registerRendererIpc(desktopIpc.commitStagedChanges, async (_event, workspaceId, message) => {
+    const validatedWorkspaceId = assertWorkspaceId(workspaceId);
+    const validatedMessage = assertCommitMessage(message);
+    const workspacePath = store.getWorkspacePath(validatedWorkspaceId);
     if (!workspacePath) {
-      throw new Error(`Unknown workspace: ${workspaceId}`);
+      throw new Error(`Unknown workspace: ${validatedWorkspaceId}`);
     }
-    await commitStagedChanges(workspacePath, message);
+    await commitStagedChanges(workspacePath, validatedMessage);
   });
   registerRendererIpc(desktopIpc.pushGitChanges, async (_event, workspaceId: string) => {
     const workspacePath = store.getWorkspacePath(workspaceId);

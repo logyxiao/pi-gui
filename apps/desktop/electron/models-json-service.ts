@@ -440,6 +440,8 @@ with open(out, 'w', encoding='utf-8') as f:
   try {
     await execFileAsync(resolvePythonCommand(), [scriptPath, databasePath, outputPath], { timeout: 15_000, maxBuffer: 1024 * 1024 * 20 });
     return JSON.parse(await readFile(outputPath, "utf8")) as unknown[];
+  } catch (error) {
+    throw wrapPythonError(error);
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }
@@ -476,6 +478,8 @@ with open(out, 'w', encoding='utf-8') as f:
   try {
     await execFileAsync(resolvePythonCommand(), [scriptPath, databasePath, outputPath], { timeout: 15_000, maxBuffer: 1024 * 1024 * 20 });
     return JSON.parse(await readFile(outputPath, "utf8")) as unknown[];
+  } catch (error) {
+    throw wrapPythonError(error);
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }
@@ -483,6 +487,14 @@ with open(out, 'w', encoding='utf-8') as f:
 
 function resolvePythonCommand(): string {
   return process.platform === "win32" ? "python" : "python3";
+}
+
+function wrapPythonError(error: unknown): Error {
+  if (error && typeof error === "object" && "code" in error && (error as { code?: string }).code === "ENOENT") {
+    const cmd = resolvePythonCommand();
+    return new Error(`cc-switch sync requires ${cmd} on PATH but it was not found. Install Python 3 or configure PATH for the Electron process.`);
+  }
+  return error instanceof Error ? error : new Error(String(error));
 }
 
 function providerFromCcSwitchRow(input: unknown): { readonly id: string; readonly config: ModelsJsonProviderConfig } | undefined {

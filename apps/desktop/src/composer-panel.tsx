@@ -11,6 +11,7 @@ import type {
 } from "./composer-commands";
 import { ComposerSurface } from "./composer-surface";
 import { useI18n } from "./i18n";
+import { readModelsJsonCached, writeModelsJsonInvalidating } from "./models-json-cache";
 import { ModelOnboardingNoticeBanner } from "./model-onboarding-notice";
 import type { ModelOnboardingState, ModelOnboardingSettingsSection } from "./model-onboarding";
 import { ModelSelector } from "./model-selector";
@@ -156,7 +157,7 @@ function ComposerPanelComponent({
       return;
     }
     try {
-      const modelsJson = await window.piApp.readModelsJson();
+      const modelsJson = await readModelsJsonCached();
       const providerConfig = modelsJson.providers[provider];
       const modelConfig = providerConfig?.models?.find((entry) => entry.id === modelId);
       setPersistedUsage({
@@ -181,7 +182,7 @@ function ComposerPanelComponent({
     setRefreshingUsage(true);
     setUsageError(undefined);
     try {
-      const modelsJson = await window.piApp.readModelsJson();
+      const modelsJson = await readModelsJsonCached();
       const providerConfig = modelsJson.providers[provider];
       if (!providerConfig?.baseUrl?.trim()) {
         setUsageError(t("composer.balanceRefreshUnavailable"));
@@ -207,7 +208,7 @@ function ComposerPanelComponent({
           },
         },
       };
-      await window.piApp.writeModelsJson(nextModelsJson);
+      await writeModelsJsonInvalidating(nextModelsJson);
       setPersistedUsage((current) => ({ ...current, balance: result.balance, checkedAt }));
     } catch (error) {
       setUsageError(describeComposerUsageError(error));

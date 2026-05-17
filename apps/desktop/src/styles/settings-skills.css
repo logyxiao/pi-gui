@@ -472,6 +472,19 @@
   background: #fbfcfe;
 }
 
+.model-manager__dirty-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 9px;
+  margin-right: auto;
+  border-radius: 999px;
+  background: #fff5e0;
+  color: #92400e;
+  font-size: 11px;
+  font-weight: 620;
+  letter-spacing: 0.02em;
+}
+
 .model-manager__toolbar-actions {
   width: 100%;
   justify-content: flex-end;

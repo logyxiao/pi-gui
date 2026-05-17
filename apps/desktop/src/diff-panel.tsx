@@ -112,16 +112,26 @@ export function DiffPanel({
     }
   }, [api, workspaceId, sessionId, t]);
 
+  const lastRefreshAtRef = useRef(0);
+  const refreshIfStale = useCallback(() => {
+    const now = Date.now();
+    if (now - lastRefreshAtRef.current < 5_000) return;
+    lastRefreshAtRef.current = now;
+    void refresh();
+  }, [refresh]);
+
   const prevStatusRef = useRef(sessionStatus);
   useEffect(() => {
     const prev = prevStatusRef.current;
     prevStatusRef.current = sessionStatus;
     if (prev === "running" && sessionStatus !== "running") {
+      lastRefreshAtRef.current = Date.now();
       void refresh();
     }
   }, [sessionStatus, refresh]);
 
   useEffect(() => {
+    lastRefreshAtRef.current = Date.now();
     void refresh();
   }, [refresh]);
 
@@ -306,7 +316,7 @@ export function DiffPanel({
   const syncActionLabel = t("changes.syncChanges", { count: syncStatus.ahead });
 
   return (
-    <aside className="diff-panel" onMouseEnter={() => void refresh()}>
+    <aside className="diff-panel" onMouseEnter={refreshIfStale}>
       <div className="diff-panel__header">
         <h2 className="diff-panel__title">{t("changes.title")}</h2>
         {files.length > 0 ? (

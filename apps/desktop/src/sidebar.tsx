@@ -86,7 +86,9 @@ function SidebarComponent(props: SidebarProps) {
     for (const container of args.droppableContainers) {
       const rect = container.rect.current;
       if (!rect) continue;
-      const headerCenter = rect.top + 15; // center of the ~30px workspace row header
+      // Distance to vertical center of the workspace row header so drop priority
+      // tracks the row regardless of theme/font scaling.
+      const headerCenter = rect.top + rect.height / 2;
       const distance = Math.abs(pointerY - headerCenter);
       if (!closest || distance < closest.distance) {
         closest = { id: String(container.id), distance };
@@ -146,7 +148,7 @@ function SidebarComponent(props: SidebarProps) {
           {sidebarToggleVisible ? (
             <div className="shortcut-tooltip-wrap sidebar__toggle-wrap">
               <button
-                aria-label="Toggle sidebar"
+                aria-label={t("sidebar.toggle")}
                 aria-pressed={!sidebarCollapsed}
                 className="icon-button sidebar__command-icon"
                 data-testid="sidebar-toggle"
@@ -569,7 +571,7 @@ function ThreadSessionRow({
       </button>
       <span className="session-row__trailing">
         {thread.environment.kind === "worktree" ? (
-          <span className="session-row__workspace-icon" aria-hidden="true" title="Worktree">
+          <span className="session-row__workspace-icon" aria-hidden="true" title={t("common.worktree")}>
             <WorktreeIcon />
           </span>
         ) : null}

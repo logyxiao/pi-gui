@@ -572,6 +572,11 @@
   background: var(--surface-muted);
 }
 
+:root.dark .model-manager__dirty-badge {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fcd34d;
+}
+
 :root.dark .model-manager__providers {
   background: var(--surface-muted);
   border-right-color: var(--line);
@@ -712,5 +717,125 @@
 :root.dark .extension-dialog__editor {
   border-color: var(--line);
   background: var(--surface-muted);
+  color: var(--text-strong);
+}
+
+/* ---------- Sidebar workspace / sessions (dark) ---------- */
+
+:root.dark .workspace-rename {
+  border-color: var(--line);
+  background: var(--surface-muted);
+}
+
+:root.dark .workspace-rename__input {
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--text-strong);
+}
+
+:root.dark .workspace-rename__actions {
+  border-color: var(--line);
+  background: var(--surface-muted);
+}
+
+:root.dark .session-row--active {
+  border-color: var(--line-strong);
+  background: var(--surface);
+}
+
+:root.dark .sidebar__footer {
+  border-top-color: var(--line);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* ---------- App shell / topbar / environment picker (dark) ---------- */
+
+:root.dark .environment-picker__button {
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--text-strong);
+}
+
+:root.dark .shortcut-tooltip {
+  border-color: var(--line);
+  background: rgba(40, 42, 48, 0.96);
+  color: var(--text-strong);
+}
+
+:root.dark .shortcut-tooltip kbd {
+  border-color: var(--line);
+  background: var(--surface-muted);
+  color: var(--muted-strong);
+}
+
+:root.dark .sidebar-toggle__button {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* ---------- Slash / mention menus (dark) ---------- */
+
+:root.dark .slash-menu__section + .slash-menu__section {
+  border-top-color: var(--line);
+}
+
+:root.dark .slash-menu__item:hover,
+:root.dark .slash-menu__option:hover {
+  background: var(--surface-muted);
+}
+
+:root.dark .mention-menu__item--active {
+  background: var(--surface-muted);
+}
+
+/* ---------- Tree modal (dark) ---------- */
+
+:root.dark .tree-modal__backdrop {
+  background: rgba(8, 11, 18, 0.55);
+}
+
+:root.dark .tree-modal {
+  border-color: var(--line);
+  background: var(--surface);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.5);
+}
+
+:root.dark .tree-modal__title-bar,
+:root.dark .tree-modal__search {
+  border-color: var(--line);
+  background: var(--surface-muted);
+}
+
+:root.dark .tree-modal__breadcrumbs {
+  border-color: var(--line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015));
+}
+
+:root.dark .tree-modal__node {
+  border-color: var(--line);
+  background: var(--surface);
+}
+
+:root.dark .tree-modal__node:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-muted);
+}
+
+/* ---------- Composer (dark complementary) ---------- */
+
+:root.dark .composer__hint {
+  border-bottom-color: var(--line);
+}
+
+:root.dark .composer__chip,
+:root.dark .composer__chip-group {
+  border-color: var(--line);
+  background: var(--surface-muted);
+}
+
+/* ---------- Secondary surface select (dark) ---------- */
+
+:root.dark .surface-toolbar__field select {
+  border-color: var(--line);
+  background: var(--surface);
   color: var(--text-strong);
 }

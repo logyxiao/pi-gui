@@ -9,6 +9,7 @@ import {
   THINKING_LEVELS,
 } from "./settings-utils";
 import { useI18n, type I18nContextValue } from "./i18n";
+import { invalidateModelsJsonCache } from "./models-json-cache";
 import { SearchableSelect } from "./searchable-select";
 import { ToggleSwitch } from "./toggle-switch";
 
@@ -308,6 +309,7 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
     try {
       const result = await window.piApp.writeModelsJson(modelsJson);
       const patterns = await window.piApp.syncEnabledModels(modelsJson);
+      invalidateModelsJsonCache();
       setSavedSnapshot(JSON.stringify(modelsJson));
       onRefreshRuntime?.();
       setStatus({ kind: "ok", text: t("settings.models.saved", { providers: result.providerCount, models: result.modelCount, patterns: patterns.length }) });
@@ -363,6 +365,7 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
     };
     try {
       await window.piApp.writeModelsJson(nextModelsJson);
+      invalidateModelsJsonCache();
       setSavedSnapshot((current) => {
         const baseline = current ? safeParseSnapshot(current) : modelsJson;
         const merged: ModelsJsonFile = {
@@ -398,6 +401,7 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
     try {
       const result = await window.piApp.syncCcSwitchProviders();
       const file = await window.piApp.readModelsJson();
+      invalidateModelsJsonCache();
       const ids = Object.keys(file.providers).sort((a, b) => a.localeCompare(b));
       setModelsJson(file);
       setSavedSnapshot(JSON.stringify(file));
@@ -575,6 +579,15 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
 interface StatusMessage {
   readonly kind: "ok" | "error";
   readonly text: string;
+}
+
+function safeParseSnapshot(serialized: string): ModelsJsonFile {
+  try {
+    const parsed = JSON.parse(serialized) as ModelsJsonFile;
+    return parsed && typeof parsed === "object" && parsed.providers ? parsed : { providers: {} };
+  } catch {
+    return { providers: {} };
+  }
 }
 
 function formatProbeResult(action: string, result: ProviderProbeResult, t: I18nContextValue["t"]): string {

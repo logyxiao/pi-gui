@@ -1,14 +1,26 @@
 import { execFile } from "node:child_process";
+import { realpathSync } from "node:fs";
 import path from "node:path";
 import type { PiSdkDriver } from "@pi-gui/pi-sdk-driver";
 import type { SessionModelSelection, WorkspaceRef } from "@pi-gui/session-driver";
 
-function validateFilePath(workspacePath: string, filePath: string): string {
-  const resolved = path.resolve(workspacePath, filePath);
-  if (!resolved.startsWith(workspacePath + path.sep) && resolved !== workspacePath) {
-    throw new Error("Path escapes workspace");
+function canonicalize(p: string): string {
+  try {
+    return realpathSync(p);
+  } catch {
+    return path.resolve(p);
   }
-  return filePath;
+}
+
+function validateFilePath(workspacePath: string, filePath: string): string {
+  const canonicalRoot = canonicalize(workspacePath);
+  const candidate = path.resolve(canonicalRoot, filePath);
+  const canonicalCandidate = canonicalize(candidate);
+  const relative = path.relative(canonicalRoot, canonicalCandidate);
+  if (relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))) {
+    return filePath;
+  }
+  throw new Error("Path escapes workspace");
 }
 
 export interface ChangedFileEntry {
