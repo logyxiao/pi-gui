@@ -303,7 +303,7 @@ export function DiffPanel({
   const canSync = hasUnpushedCommits && !syncBusy && !commitBusy;
   const canCommit = hasStagedFiles && commitMessage.trim().length > 0 && !commitBusy;
   const showSyncAction = !hasLocalChanges && hasUnpushedCommits;
-  const syncStatusLabel = getSyncStatusLabel(syncStatus, t);
+  const syncActionLabel = t("changes.syncChanges", { count: syncStatus.ahead });
 
   return (
     <aside className="diff-panel" onMouseEnter={() => void refresh()}>
@@ -352,16 +352,20 @@ export function DiffPanel({
         </div>
         <div className="diff-panel__commit-action-row">
           <button
-            className="diff-panel__commit-btn"
+            className={`diff-panel__commit-btn${showSyncAction ? " diff-panel__commit-btn--sync" : ""}`}
             type="button"
             onClick={showSyncAction ? handleSync : handleCommit}
             disabled={showSyncAction ? !canSync : !canCommit}
           >
             {showSyncAction
-              ? (syncBusy ? t("changes.syncing") : t("changes.sync"))
+              ? (
+                  <>
+                    <RefreshIcon />
+                    <span>{syncBusy ? t("changes.syncing") : syncActionLabel}</span>
+                  </>
+                )
               : (commitBusy ? t("changes.committing") : t("changes.commit"))}
           </button>
-          {syncStatusLabel ? <div className="diff-panel__sync-status">{syncStatusLabel}</div> : null}
         </div>
         {errorMessage ? <div className="diff-panel__error">{errorMessage}</div> : null}
       </div>
@@ -425,25 +429,6 @@ export function DiffPanel({
       </div>
     </aside>
   );
-}
-
-function getSyncStatusLabel(
-  status: GitSyncStatus,
-  t: (key: string, values?: Record<string, string | number>) => string,
-): string {
-  if (!status.hasUpstream) {
-    return t("changes.syncStatusNoUpstream");
-  }
-  if (status.ahead > 0 && status.behind > 0) {
-    return t("changes.syncStatusDiverged", { ahead: status.ahead, behind: status.behind });
-  }
-  if (status.ahead > 0) {
-    return t("changes.syncStatusAhead", { count: status.ahead });
-  }
-  if (status.behind > 0) {
-    return t("changes.syncStatusBehind", { count: status.behind });
-  }
-  return t("changes.syncStatusClean");
 }
 
 interface ChangeSectionProps {
