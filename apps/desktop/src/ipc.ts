@@ -120,6 +120,7 @@ export const desktopIpc = {
   stageAllFiles: "pi-gui:stage-all-files",
   unstageAllFiles: "pi-gui:unstage-all-files",
   commitStagedChanges: "pi-gui:commit-staged-changes",
+  pushGitChanges: "pi-gui:push-git-changes",
   generateCommitMessage: "pi-gui:generate-commit-message",
   getCommitHistory: "pi-gui:get-commit-history",
   getGitSyncStatus: "pi-gui:get-git-sync-status",
@@ -356,6 +357,7 @@ export interface PiDesktopApi {
   stageAllFiles(workspaceId: string): Promise<void>;
   unstageAllFiles(workspaceId: string): Promise<void>;
   commitStagedChanges(workspaceId: string, message: string): Promise<void>;
+  pushGitChanges(workspaceId: string): Promise<void>;
   generateCommitMessage(workspaceId: string, sessionId?: string): Promise<string>;
   getCommitHistory(workspaceId: string): Promise<{ hash: string; subject: string; author: string; relativeTime: string; refs: readonly string[] }[]>;
   getGitSyncStatus(workspaceId: string): Promise<{ ahead: number; behind: number; hasUpstream: boolean }>;

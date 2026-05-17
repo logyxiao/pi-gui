@@ -22,6 +22,7 @@ import {
   getChangedFiles,
   getFileDiff,
   getGitSyncStatus,
+  pushGitChanges,
   stageAllFiles,
   stageFile,
   unstageAllFiles,
@@ -816,6 +817,13 @@ app.whenReady().then(async () => {
       throw new Error(`Unknown workspace: ${workspaceId}`);
     }
     await commitStagedChanges(workspacePath, message);
+  });
+  registerRendererIpc(desktopIpc.pushGitChanges, async (_event, workspaceId: string) => {
+    const workspacePath = store.getWorkspacePath(workspaceId);
+    if (!workspacePath) {
+      throw new Error(`Unknown workspace: ${workspaceId}`);
+    }
+    await pushGitChanges(workspacePath);
   });
   registerRendererIpc(desktopIpc.generateCommitMessage, async (_event, workspaceId: string, sessionId?: string) => {
     const workspacePath = store.getWorkspacePath(workspaceId);

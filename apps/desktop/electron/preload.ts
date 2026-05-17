@@ -276,6 +276,8 @@ contextBridge.exposeInMainWorld("piApp", {
     ipcRenderer.invoke(desktopIpc.unstageAllFiles, workspaceId) as Promise<void>,
   commitStagedChanges: (workspaceId: string, message: string) =>
     ipcRenderer.invoke(desktopIpc.commitStagedChanges, workspaceId, message) as Promise<void>,
+  pushGitChanges: (workspaceId: string) =>
+    ipcRenderer.invoke(desktopIpc.pushGitChanges, workspaceId) as Promise<void>,
   generateCommitMessage: (workspaceId: string, sessionId?: string) =>
     ipcRenderer.invoke(desktopIpc.generateCommitMessage, workspaceId, sessionId) as Promise<string>,
   getCommitHistory: (workspaceId: string) =>

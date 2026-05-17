@@ -207,7 +207,7 @@ export function DiffPanel({
   const handleSync = () => {
     setSyncBusy(true);
     setErrorMessage("");
-    void api.syncCurrentWorkspace().then(async () => {
+    void api.pushGitChanges(workspaceId).then(async () => {
       await refresh();
       setSyncBusy(false);
     }).catch((error: unknown) => {

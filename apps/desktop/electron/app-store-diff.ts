@@ -148,6 +148,10 @@ export function commitStagedChanges(workspacePath: string, message: string): Pro
   return runGit(workspacePath, ["commit", "-m", normalizedMessage]);
 }
 
+export function pushGitChanges(workspacePath: string): Promise<void> {
+  return runGit(workspacePath, ["push"]);
+}
+
 export async function generateCommitMessage(input: GenerateCommitMessageInput): Promise<string> {
   const nameStatus = await getStagedNameStatus(input.workspace.path);
   if (!nameStatus.trim()) {
