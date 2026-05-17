@@ -761,6 +761,17 @@
   width: 100%;
 }
 
+.model-manager__api-type-select {
+  width: 100%;
+}
+
+.model-manager__api-type-select .searchable-select__button {
+  min-height: 34px;
+  padding: 7px 9px;
+  border-radius: 9px;
+  font-size: 12px;
+}
+
 .model-manager__add .settings-text-input {
   flex: 1 1 180px;
   min-width: 0;

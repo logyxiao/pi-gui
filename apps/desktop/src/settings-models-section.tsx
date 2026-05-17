@@ -19,6 +19,21 @@ interface SettingsModelsSectionProps {
   readonly onRefreshRuntime?: () => void;
 }
 
+const API_TYPE_OPTIONS = [
+  { value: "openai-responses", label: "OpenAI Responses", meta: "openai-responses" },
+  { value: "openai-completions", label: "OpenAI Completions", meta: "openai-completions" },
+  { value: "anthropic-messages", label: "Anthropic Messages", meta: "anthropic-messages" },
+  { value: "google-generative-ai", label: "Google Generative AI", meta: "google-generative-ai" },
+  { value: "google-vertex", label: "Google Vertex AI", meta: "google-vertex" },
+  { value: "azure-openai-responses", label: "Azure OpenAI Responses", meta: "azure-openai-responses" },
+  { value: "mistral-conversations", label: "Mistral Conversations", meta: "mistral-conversations" },
+  { value: "bedrock-converse-stream", label: "Amazon Bedrock Converse", meta: "bedrock-converse-stream" },
+  { value: "openai-codex-responses", label: "OpenAI Codex Responses", meta: "openai-codex-responses" },
+  { value: "openai", label: "OpenAI", meta: "openai" },
+  { value: "anthropic", label: "Anthropic", meta: "anthropic" },
+  { value: "gemini", label: "Gemini", meta: "gemini" },
+] as const;
+
 export function SettingsModelsSection({
   runtime,
   onSetDefaultModel,
@@ -127,6 +142,16 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
     if (!query) return entries;
     return entries.filter(({ model }) => [model.id, model.name ?? ""].some((value) => value.toLowerCase().includes(query)));
   }, [modelQuery, selectedModels]);
+  const apiTypeOptions = useMemo(() => {
+    const currentApi = selectedProvider?.api?.trim();
+    if (!currentApi || API_TYPE_OPTIONS.some((option) => option.value === currentApi)) {
+      return API_TYPE_OPTIONS;
+    }
+    return [
+      { value: currentApi, label: currentApi, meta: "custom" },
+      ...API_TYPE_OPTIONS,
+    ];
+  }, [selectedProvider?.api]);
 
   useEffect(() => {
     let cancelled = false;
@@ -441,7 +466,17 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
               </div>
               <div className="model-manager__compact-grid">
                 <label className="settings-field">{t("settings.models.baseUrl")}<input className="settings-text-input" value={selectedProvider.baseUrl ?? ""} onChange={(event) => setProvider(selectedProviderId, (provider) => ({ ...provider, baseUrl: event.target.value }))} /></label>
-                <label className="settings-field">{t("settings.models.apiType")}<input className="settings-text-input" placeholder={t("settings.models.apiTypePlaceholder")} value={selectedProvider.api ?? ""} onChange={(event) => setProvider(selectedProviderId, (provider) => ({ ...provider, api: event.target.value }))} /></label>
+                <label className="settings-field">
+                  {t("settings.models.apiType")}
+                  <SearchableSelect
+                    className="model-manager__api-type-select"
+                    value={selectedProvider.api ?? ""}
+                    placeholder={t("settings.models.apiTypePlaceholder")}
+                    searchPlaceholder={t("settings.models.apiTypePlaceholder")}
+                    options={apiTypeOptions}
+                    onChange={(value) => setProvider(selectedProviderId, (provider) => ({ ...provider, api: value }))}
+                  />
+                </label>
                 <label className="settings-field">{t("settings.models.apiKey")}<input className="settings-text-input" type="password" value={selectedProvider.apiKey ?? ""} onChange={(event) => setProvider(selectedProviderId, (provider) => ({ ...provider, apiKey: event.target.value }))} /></label>
               </div>
               <div className="settings-row__actions model-manager__actions">
