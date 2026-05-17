@@ -23,9 +23,8 @@ import {
 import { deriveModelOnboardingState } from "./model-onboarding";
 import { SkillsView } from "./skills-view";
 import { ExtensionsView } from "./extensions-view";
-import { SettingsView, type SettingsSection } from "./settings-view";
-import { SecondarySurface } from "./secondary-surface";
-import { SearchableSelect } from "./searchable-select";
+import { type SettingsSection } from "./settings-view";
+import { SettingsSurface } from "./settings-surface";
 import { NewThreadView } from "./new-thread-view";
 import { buildThreadGroups } from "./thread-groups";
 import { Sidebar } from "./sidebar";
@@ -33,6 +32,9 @@ import { SidebarToggleButton } from "./sidebar-toggle-button";
 import { Topbar } from "./topbar";
 import { TerminalPanel } from "./terminal-panel";
 import { useSlashMenu } from "./hooks/use-slash-menu";
+import { useConfirmDialog } from "./hooks/use-confirm-dialog";
+import { useNotificationPermission } from "./hooks/use-notification-permission";
+import { useThemeMode } from "./hooks/use-theme-mode";
 import { useMentionMenu } from "./hooks/use-mention-menu";
 import { useThreadSearch } from "./hooks/use-thread-search";
 import { useTimelineController } from "./hooks/use-timeline-controller";
@@ -43,7 +45,7 @@ import { updateSnapshot, useDesktopAppState } from "./hooks/use-desktop-app-stat
 import { useRunningLabel } from "./hooks/use-running-label";
 import { useTerminalPanelController } from "./hooks/use-terminal-panel-controller";
 import { buildExtensionDockModel, hasExtensionDockContent } from "./extension-session-ui";
-import { ConfirmDialog, type ConfirmDialogProps } from "./confirm-dialog";
+import { ConfirmDialog } from "./confirm-dialog";
 import { ThreadView } from "./thread-view";
 import { getEffectiveModelRuntime } from "./model-settings";
 import { resolveRepoWorkspaceId } from "./workspace-roots";
@@ -78,10 +80,7 @@ export default function App({
   const [newThreadModelId, setNewThreadModelId] = useState<string | undefined>();
   const [newThreadThinkingLevel, setNewThreadThinkingLevel] = useState<string | undefined>();
   const [newThreadComposerError, setNewThreadComposerError] = useState<string | undefined>();
-  const [themeMode, setThemeMode] = useState<"system" | "light" | "dark">("system");
-  const [notificationPermissionStatus, setNotificationPermissionStatus] =
-    useState<DesktopNotificationPermissionStatus>("unknown");
-  const [notificationPermissionPending, setNotificationPermissionPending] = useState(false);
+  const { mode: themeMode, setMode: setThemeMode } = useThemeMode();
   const [dockExpandedBySession, setDockExpandedBySession] = useState<Record<string, boolean>>({});
   const [treeModalState, setTreeModalState] = useState<{
     readonly open: boolean;
@@ -94,33 +93,20 @@ export default function App({
     loading: false,
     submitting: false,
   });
-  const [confirmDialog, setConfirmDialog] = useState<
-    (Pick<ConfirmDialogProps, "title" | "message" | "confirmLabel" | "cancelLabel" | "tone"> & {
-      readonly resolve: (confirmed: boolean) => void;
-    }) | null
-  >(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const newThreadComposerRef = useRef<HTMLTextAreaElement | null>(null);
   const previousActiveViewRef = useRef<AppView | null>(null);
   const [showDiffPanel, setShowDiffPanel] = useState(false);
   const [diffFileRequest, setDiffFileRequest] = useState<DiffPanelFileRequest | null>(null);
   const api = window.piApp;
-  const requestConfirm = useCallback(
-    (options: Pick<ConfirmDialogProps, "title" | "message" | "confirmLabel" | "cancelLabel" | "tone">) =>
-      new Promise<boolean>((resolve) => {
-        setConfirmDialog((current) => {
-          current?.resolve(false);
-          return { ...options, resolve };
-        });
-      }),
-    [],
-  );
-  const closeConfirmDialog = useCallback((confirmed: boolean) => {
-    setConfirmDialog((current) => {
-      current?.resolve(confirmed);
-      return null;
-    });
-  }, []);
+  const { pending: confirmDialog, request: requestConfirm, close: closeConfirmDialog } = useConfirmDialog();
+  const notificationsViewActive = snapshot?.activeView === "settings" && settingsSection === "notifications";
+  const {
+    status: notificationPermissionStatus,
+    pending: notificationPermissionPending,
+    setPending: setNotificationPermissionPending,
+    refresh: refreshNotificationPermissionStatus,
+  } = useNotificationPermission(notificationsViewActive);
   const sidebarToggleStateRef = useRef<{
     readonly api: typeof window.piApp;
     readonly activeView: AppView | undefined;
@@ -135,56 +121,6 @@ export default function App({
     activeView: snapshot?.activeView,
     sidebarCollapsed: snapshot?.sidebarCollapsed ?? false,
   };
-
-  useEffect(() => {
-    const piApi = window.piApp;
-    if (!piApi) return;
-
-    void piApi.getResolvedTheme().then((theme) => {
-      document.documentElement.classList.toggle("dark", theme === "dark");
-    });
-
-    void piApi.getThemeMode().then((mode) => {
-      setThemeMode(mode);
-    });
-
-    const unsub = piApi.onThemeChanged((theme) => {
-      document.documentElement.classList.toggle("dark", theme === "dark");
-    });
-
-    return unsub;
-  }, []);
-
-  useEffect(() => {
-    const piApi = window.piApp;
-    if (!piApi?.onNotificationPermissionStatusChanged) {
-      return;
-    }
-
-    return piApi.onNotificationPermissionStatusChanged((status) => {
-      setNotificationPermissionStatus(status);
-    });
-  }, []);
-
-  const refreshNotificationPermissionStatus = useCallback(() => {
-    if (!api?.getNotificationPermissionStatus) {
-      return Promise.resolve("unknown" as DesktopNotificationPermissionStatus);
-    }
-
-    return api.getNotificationPermissionStatus().then((status) => {
-      setNotificationPermissionStatus(status);
-      return status;
-    });
-  }, [api]);
-
-  useEffect(() => {
-    if (snapshot?.activeView !== "settings" || settingsSection !== "notifications") {
-      return undefined;
-    }
-
-    void refreshNotificationPermissionStatus();
-    return undefined;
-  }, [refreshNotificationPermissionStatus, settingsSection, snapshot?.activeView]);
 
   const selectedWorkspace = useMemo(
     () => snapshot ? (getSelectedWorkspace(snapshot) ?? snapshot.workspaces[0]) : undefined,
@@ -1107,9 +1043,7 @@ export default function App({
     setNotificationPermissionPending(true);
     void api
       .requestNotificationPermission()
-      .then((status) => {
-        setNotificationPermissionStatus(status);
-      })
+      .then(() => refreshNotificationPermissionStatus())
       .finally(() => {
         setNotificationPermissionPending(false);
       });
@@ -1274,73 +1208,57 @@ export default function App({
 
   if (snapshot.activeView === "settings") {
     return (
-      <SecondarySurface
-        activeNavId={settingsSection}
+      <SettingsSurface
+        section={settingsSection}
+        settingsWorkspace={settingsWorkspace}
+        settingsRuntime={settingsRuntime}
+        settingsModelRuntime={settingsModelRuntime}
+        rootWorkspaceOptions={rootWorkspaceOptions}
+        settingsWorkspaceId={settingsWorkspaceId}
+        notificationPreferences={snapshot.notificationPreferences}
+        notificationPermissionStatus={notificationPermissionStatus}
+        notificationPermissionPending={notificationPermissionPending}
+        modelSettingsScopeMode={snapshot.modelSettingsScopeMode}
+        integratedTerminalShell={snapshot.integratedTerminalShell}
+        themeMode={themeMode}
+        language={language}
+        commandCompatibility={settingsExtensionCommandCompatibility}
         navItems={settingsNav}
         onBack={() => setActiveView("threads")}
-        onSelectNav={(section) => setSettingsSection(section as SettingsSection)}
-        testId="settings-surface"
-        title={t("settings.title")}
-      >
-        {settingsSection === "providers" || settingsSection === "skills" || settingsSection === "extensions" || (settingsSection === "models" && snapshot.modelSettingsScopeMode === "per-repo") ? (
-          <div className="surface-toolbar">
-            <label className="surface-toolbar__field">
-              <span>{t("common.workspace")}</span>
-              <SearchableSelect
-                value={settingsWorkspace?.id ?? ""}
-                placeholder={t("common.workspace")}
-                searchPlaceholder={t("common.workspace")}
-                options={rootWorkspaceOptions.map((workspace) => ({ value: workspace.id, label: workspace.name }))}
-                onChange={(value) => setSettingsWorkspaceId(value)}
-              />
-            </label>
-          </div>
-        ) : null}
-        <SettingsView
-          workspace={settingsWorkspace}
-          runtime={settingsSection === "models" ? settingsModelRuntime : settingsRuntime}
-          section={settingsSection}
-          notificationPreferences={snapshot.notificationPreferences}
-          notificationPermissionStatus={notificationPermissionStatus}
-          notificationPermissionPending={notificationPermissionPending}
-          modelSettingsScopeMode={snapshot.modelSettingsScopeMode}
-          integratedTerminalShell={snapshot.integratedTerminalShell}
-          themeMode={themeMode}
-          language={language}
-          onLoginProvider={handleLoginProvider}
-          onLogoutProvider={handleLogoutProvider}
-          onSetProviderApiKey={handleSetProviderApiKey}
-          onRemoveProviderApiKey={handleRemoveProviderApiKey}
-          onSetModelSettingsScopeMode={handleSetModelSettingsScopeMode}
-          onSetDefaultModel={handleSetDefaultModel}
-          onSetNotificationPreferences={handleSetNotificationPreferences}
-          onSetIntegratedTerminalShell={handleSetIntegratedTerminalShell}
-          onRequestNotificationPermission={handleRequestNotificationPermission}
-          onOpenSystemNotificationSettings={handleOpenSystemNotificationSettings}
-          onSetThemeMode={handleSetThemeMode}
-          onSetLanguage={onSetLanguage}
-          onSetThinkingLevel={handleSetThinkingLevel}
-          onToggleSkillCommands={handleToggleSkillCommands}
-          commandCompatibility={settingsExtensionCommandCompatibility}
-          onRefreshRuntime={() => {
-            if (!settingsWorkspace) {
-              return;
-            }
-            void updateSnapshot(api, setSnapshot, () => api.refreshRuntime(settingsWorkspace.id));
-          }}
-          onOpenSkillFolder={handleOpenSkillFolder}
-          onToggleSkill={handleToggleSkill}
-          onTrySkill={(skill) =>
-            handleTrySkill(
-              skill.filePath
-                ? `${skill.slashCommand} `
-                : "Create a new skill for this workspace and explain which files you will add.",
-            )
+        onSelectSection={(section) => setSettingsSection(section)}
+        onSelectWorkspaceId={setSettingsWorkspaceId}
+        onLoginProvider={handleLoginProvider}
+        onLogoutProvider={handleLogoutProvider}
+        onSetProviderApiKey={handleSetProviderApiKey}
+        onRemoveProviderApiKey={handleRemoveProviderApiKey}
+        onSetModelSettingsScopeMode={handleSetModelSettingsScopeMode}
+        onSetDefaultModel={handleSetDefaultModel}
+        onSetThinkingLevel={handleSetThinkingLevel}
+        onSetNotificationPreferences={handleSetNotificationPreferences}
+        onSetIntegratedTerminalShell={handleSetIntegratedTerminalShell}
+        onRequestNotificationPermission={handleRequestNotificationPermission}
+        onOpenSystemNotificationSettings={handleOpenSystemNotificationSettings}
+        onSetThemeMode={handleSetThemeMode}
+        onSetLanguage={onSetLanguage}
+        onToggleSkillCommands={handleToggleSkillCommands}
+        onRefreshRuntime={() => {
+          if (!settingsWorkspace) {
+            return;
           }
-          onOpenExtensionFolder={handleOpenExtensionFolder}
-          onToggleExtension={handleToggleExtension}
-        />
-      </SecondarySurface>
+          void updateSnapshot(api, setSnapshot, () => api.refreshRuntime(settingsWorkspace.id));
+        }}
+        onOpenSkillFolder={handleOpenSkillFolder}
+        onToggleSkill={handleToggleSkill}
+        onTrySkill={(skill) =>
+          handleTrySkill(
+            skill.filePath
+              ? `${skill.slashCommand} `
+              : "Create a new skill for this workspace and explain which files you will add.",
+          )
+        }
+        onOpenExtensionFolder={handleOpenExtensionFolder}
+        onToggleExtension={handleToggleExtension}
+      />
     );
   }
 

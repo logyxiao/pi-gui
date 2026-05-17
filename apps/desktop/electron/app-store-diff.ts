@@ -12,7 +12,7 @@ function canonicalize(p: string): string {
   }
 }
 
-function validateFilePath(workspacePath: string, filePath: string): string {
+export function validateFilePath(workspacePath: string, filePath: string): string {
   const canonicalRoot = canonicalize(workspacePath);
   const candidate = path.resolve(canonicalRoot, filePath);
   const canonicalCandidate = canonicalize(candidate);

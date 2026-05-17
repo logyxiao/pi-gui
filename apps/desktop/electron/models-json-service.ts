@@ -278,7 +278,7 @@ interface ParsedUsageScript {
   readonly extractor?: string;
 }
 
-function parseUsageScript(script: string | undefined): ParsedUsageScript | undefined {
+export function parseUsageScript(script: string | undefined): ParsedUsageScript | undefined {
   if (!script?.trim()) return undefined;
   const url = /url\s*:\s*["'`]([^"'`]+)["'`]/.exec(script)?.[1];
   if (!url) return undefined;
@@ -334,7 +334,7 @@ function readJsonPath(value: unknown, path: string): unknown {
   return current;
 }
 
-function summarizeUsageResult(result: unknown): string {
+export function summarizeUsageResult(result: unknown): string {
   if (result && typeof result === "object") {
     const record = result as Record<string, unknown>;
     const remaining = firstNumericLikeValue(record, ["remaining", "remain", "available", "available_balance", "availableBalance"])
@@ -372,7 +372,7 @@ function buildHeaders(input: ProviderEndpointProbeInput): HeadersInit {
   return headers;
 }
 
-function extractModelIds(parsed: unknown): string[] {
+export function extractModelIds(parsed: unknown): string[] {
   const candidates: unknown[] = [];
   if (parsed && typeof parsed === "object") {
     const record = parsed as Record<string, unknown>;
@@ -655,7 +655,7 @@ function sanitizeProviderId(value: string): string {
   return value.trim().replace(/[^a-zA-Z0-9_.-]+/g, "-").replace(/^-+|-+$/g, "") || "cc-switch";
 }
 
-function tryParseJson(value: string): unknown | undefined {
+export function tryParseJson(value: string): unknown | undefined {
   const trimmed = value.trim();
   if (!trimmed || !["{", "["].includes(trimmed[0] ?? "")) return undefined;
   try {
@@ -714,7 +714,7 @@ function normalizeStringRecord(value: unknown): Record<string, string> {
   return result;
 }
 
-function stripJsonCommentsAndTrailingCommas(input: string): string {
+export function stripJsonCommentsAndTrailingCommas(input: string): string {
   let output = "";
   let inString = false;
   let stringQuote = "";
