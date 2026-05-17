@@ -238,13 +238,13 @@ function generateFallbackCommitMessage(nameStatus: string): string {
 
   const firstFile = files[0] ?? "";
   const primary = summarizePath(firstFile);
-  const verb = chooseCommitVerb(nameStatus);
+  const type = inferConventionalCommitType(nameStatus, files);
   if (files.length === 1) {
-    return `${verb} ${primary}`;
+    return `${type}: ${summarizeFallbackSubject(nameStatus, primary)}`;
   }
 
   const scope = summarizeSharedScope(files) ?? `${files.length} files`;
-  return `${verb} ${scope}`;
+  return `${type}: ${summarizeFallbackSubject(nameStatus, scope)}`;
 }
 
 function runGit(workspacePath: string, args: readonly string[]): Promise<void> {
@@ -321,18 +321,38 @@ function hasUnstagedChanges(xy: string): boolean {
   return x === "?" || y !== " ";
 }
 
-function chooseCommitVerb(nameStatus: string): string {
+function summarizeFallbackSubject(nameStatus: string, scope: string): string {
   const statuses = nameStatus
     .split("\n")
     .map((line) => line.trim().slice(0, 1))
     .filter(Boolean);
   if (statuses.length > 0 && statuses.every((status) => status === "A")) {
-    return "Add";
+    return `add ${scope}`;
   }
   if (statuses.length > 0 && statuses.every((status) => status === "D")) {
-    return "Remove";
+    return `remove ${scope}`;
   }
-  return "Update";
+  return `update ${scope}`;
+}
+
+function inferConventionalCommitType(nameStatus: string, files: readonly string[]): string {
+  if (files.length > 0 && files.every((file) => /(^|\/)(test|tests|__tests__)\/|(\.|-)(test|spec)\.[cm]?[jt]sx?$/i.test(file))) {
+    return "test";
+  }
+  if (files.length > 0 && files.every((file) => /\.(md|mdx|txt|rst)$/i.test(file))) {
+    return "docs";
+  }
+  if (files.length > 0 && files.every((file) => /(^|\/)(package\.json|pnpm-lock\.yaml|yarn\.lock|package-lock\.json|vite\.config|tsconfig|electron-builder|build|scripts)\b/i.test(file))) {
+    return "build";
+  }
+  const statuses = nameStatus
+    .split("\n")
+    .map((line) => line.trim().slice(0, 1))
+    .filter(Boolean);
+  if (statuses.length > 0 && statuses.every((status) => status === "D")) {
+    return "chore";
+  }
+  return "feat";
 }
 
 function summarizePath(filePath: string): string {

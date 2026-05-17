@@ -29,6 +29,8 @@ const MAX_COMMIT_MESSAGE_LENGTH = 96;
 const COMMIT_MESSAGE_SYSTEM_PROMPT = [
   "You write concise git commit messages for a coding assistant desktop app.",
   "Return only the commit message subject.",
+  "Use Conventional Commits format: type: subject.",
+  "Prefer one of: feat, fix, refactor, perf, docs, test, build, ci, chore, style, revert.",
   "Use imperative mood.",
   "Keep it under 72 characters when possible.",
   "Use the same language as the changed code context when obvious.",
@@ -88,7 +90,7 @@ export async function generateCommitMessage(
     }
 
     await session.prompt(buildCommitPrompt(nameStatus, diff), { source: "interactive" });
-    return normalizeCommitMessage(extractLastAssistantText(session));
+    return normalizeCommitMessage(extractLastAssistantText(session), nameStatus);
   } finally {
     options.signal?.removeEventListener("abort", handleAbort);
     session.dispose();
@@ -115,6 +117,8 @@ function buildCommitPrompt(nameStatus: string, diff: string): string {
     : diff;
   return [
     "Generate a git commit message subject for the staged changes.",
+    "Use Conventional Commits format, for example: feat: add workspace sync button or fix: handle push errors.",
+    "Choose the most specific type from: feat, fix, refactor, perf, docs, test, build, ci, chore, style, revert.",
     "Return only the subject line.",
     "",
     "<name_status>",
@@ -138,7 +142,7 @@ function extractLastAssistantText(session: { messages: readonly unknown[] }): st
   return "";
 }
 
-function normalizeCommitMessage(message: string): string | null {
+function normalizeCommitMessage(message: string, nameStatus: string): string | null {
   let normalized = message.replace(/\s+/g, " ").trim();
   if (!normalized) {
     return null;
@@ -149,10 +153,38 @@ function normalizeCommitMessage(message: string): string | null {
   if (!normalized) {
     return null;
   }
+  if (!hasConventionalCommitPrefix(normalized)) {
+    normalized = `${inferConventionalCommitType(nameStatus)}: ${lowercaseFirstWord(normalized)}`;
+  }
   if (normalized.length > MAX_COMMIT_MESSAGE_LENGTH) {
     normalized = normalized.slice(0, MAX_COMMIT_MESSAGE_LENGTH).trimEnd();
   }
   return normalized || null;
+}
+
+function hasConventionalCommitPrefix(value: string): boolean {
+  return /^(feat|fix|refactor|perf|docs|test|build|ci|chore|style|revert)(\([^)]+\))?!?:\s+\S/i.test(value);
+}
+
+function inferConventionalCommitType(nameStatus: string): string {
+  const files = nameStatus
+    .split("\n")
+    .map((line) => line.trim().split(/\s+/).at(-1) ?? "")
+    .filter(Boolean);
+  if (files.length > 0 && files.every((file) => /(^|\/)(test|tests|__tests__)\/|(\.|-)(test|spec)\.[cm]?[jt]sx?$/i.test(file))) {
+    return "test";
+  }
+  if (files.length > 0 && files.every((file) => /\.(md|mdx|txt|rst)$/i.test(file))) {
+    return "docs";
+  }
+  if (files.length > 0 && files.every((file) => /(^|\/)(package\.json|pnpm-lock\.yaml|yarn\.lock|package-lock\.json|vite\.config|tsconfig|electron-builder|build|scripts)\b/i.test(file))) {
+    return "build";
+  }
+  return "feat";
+}
+
+function lowercaseFirstWord(value: string): string {
+  return value.replace(/^([A-Z][A-Z0-9-]*)(\b)/, (match) => match.toLowerCase());
 }
 
 function stripWrappingQuotes(value: string): string {
