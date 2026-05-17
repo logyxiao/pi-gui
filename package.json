@@ -7,6 +7,10 @@
   "scripts": {
     "dev": "pnpm --filter @pi-gui/desktop dev",
     "build": "pnpm -r --if-present build",
+    "build:desktop:mac": "pnpm --filter @pi-gui/desktop package:mac",
+    "build:desktop:win": "pnpm --filter @pi-gui/desktop package:win",
+    "build:desktop:linux": "pnpm --filter @pi-gui/desktop package:linux",
+    "build:desktop:all": "pnpm --filter @pi-gui/desktop package:all",
     "typecheck": "pnpm --filter @pi-gui/session-driver build && pnpm --filter @pi-gui/catalogs build && pnpm --filter @pi-gui/pi-sdk-driver build && pnpm -r --if-present typecheck",
     "lint": "pnpm -r --if-present lint",
     "test": "pnpm -r --if-present test",

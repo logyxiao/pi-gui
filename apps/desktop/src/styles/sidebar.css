@@ -72,14 +72,14 @@
   border-radius: 12px;
   background: oklch(99.1% 0.004 268 / 0.58);
   border-color: var(--line);
-  color: var(--muted-strong);
+  color: var(--icon);
 }
 
 .sidebar__command-icon--active,
 .sidebar__command-icon:hover:not(:disabled) {
   background: oklch(99.1% 0.004 268 / 0.92);
   border-color: var(--line-strong);
-  color: var(--text-strong);
+  color: var(--icon-strong);
 }
 
 .sidebar__command-tooltip {
@@ -227,7 +227,7 @@
   border-radius: 9px;
   display: grid;
   place-items: center;
-  color: var(--muted-strong);
+  color: var(--icon);
 }
 
 .workspace-row:hover,
@@ -338,7 +338,7 @@
   height: 18px;
   display: grid;
   place-items: center;
-  color: var(--muted-icon);
+  color: var(--icon);
   position: absolute;
   left: 0;
   top: 50%;
@@ -648,7 +648,7 @@
   height: 14px;
   display: grid;
   place-items: center;
-  color: var(--muted-soft);
+  color: var(--icon);
   transition: opacity 140ms ease;
 }
 
@@ -668,7 +668,7 @@
 }
 
 .session-row--active .session-row__workspace-icon {
-  color: var(--muted-strong);
+  color: var(--icon-strong);
 }
 
 .session-row .session-row__action {
@@ -822,12 +822,42 @@
   color: var(--text-strong);
 }
 
+:root.dark .sidebar__command-icon {
+  border-color: color-mix(in oklch, var(--icon) 30%, transparent);
+  background: transparent;
+  color: var(--icon-strong);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--icon) 8%, transparent);
+}
+
+:root.dark .sidebar__command-icon:hover:not(:disabled),
+:root.dark .sidebar__command-icon:focus-visible {
+  border-color: color-mix(in oklch, var(--icon-active) 62%, var(--line-strong));
+  background: color-mix(in oklch, var(--icon-active) 14%, transparent);
+  color: var(--icon-active);
+  box-shadow:
+    0 0 0 3px color-mix(in oklch, var(--icon-active) 10%, transparent),
+    inset 0 0 0 1px color-mix(in oklch, var(--icon-active) 12%, transparent);
+}
+
 :root.dark .workspace-row:hover,
 :root.dark .session-row:hover,
 :root.dark .icon-button:hover:not(:disabled),
 :root.dark .sidebar__settings:hover {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.08);
+}
+
+:root.dark .icon-button {
+  color: var(--icon);
+}
+
+:root.dark .icon-button:hover:not(:disabled),
+:root.dark .icon-button:focus-visible {
+  color: var(--icon-strong);
+}
+
+:root.dark .sidebar__command-icon--active {
+  color: var(--icon-active);
 }
 
 :root.dark .session-row--active {

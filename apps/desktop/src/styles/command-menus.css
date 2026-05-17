@@ -35,7 +35,7 @@
   align-items: center;
   gap: 8px;
   padding: 8px 10px 4px;
-  color: var(--muted-soft);
+  color: var(--muted);
   font-size: 12px;
   font-weight: 560;
 }
@@ -45,7 +45,7 @@
 }
 
 .slash-menu__section-title--host {
-  color: var(--muted-strong);
+  color: var(--icon);
 }
 
 .slash-menu__section-icon {
@@ -114,6 +114,31 @@
 
 .dark .slash-menu__skill-badge--warning {
   color: #f0b25a;
+}
+
+:root.dark .slash-menu__section + .slash-menu__section {
+  border-top-color: var(--line);
+}
+
+:root.dark .slash-menu__item--active,
+:root.dark .slash-menu__item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+:root.dark .slash-menu__section-title,
+:root.dark .slash-menu__skill-badge,
+:root.dark .slash-menu__icon {
+  color: var(--icon);
+}
+
+:root.dark .slash-menu__section-title--runtime,
+:root.dark .slash-menu__title {
+  color: var(--text-strong);
+}
+
+:root.dark .slash-menu__section-title--host,
+:root.dark .slash-menu__skill-badge--warning {
+  color: var(--icon-strong);
 }
 
 .slash-menu__content {
@@ -264,4 +289,3 @@
 .mention-menu__filename {
   font-weight: 600;
 }
-

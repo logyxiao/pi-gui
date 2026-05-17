@@ -17,6 +17,9 @@
   --muted-path: oklch(67% 0.026 268);
   --muted-settings: oklch(61% 0.032 268);
   --accent: oklch(55% 0.18 272);
+  --icon: var(--muted-icon);
+  --icon-strong: var(--text-strong);
+  --icon-active: var(--accent);
   --error: #c45666;
   --error-ink: #8f3040;
   --font-ui:
@@ -47,23 +50,26 @@
 
 :root.dark {
   color-scheme: dark;
-  --window: #1a1b1e;
-  --sidebar: #202124;
-  --main: #1e1f22;
-  --surface: #2b2d31;
-  --surface-muted: #232428;
-  --line: #3a3c42;
-  --line-strong: #4a4d55;
-  --text: #d4d4d8;
-  --text-strong: #f4f4f5;
-  --muted: #8b8d94;
-  --muted-strong: #9ea0a8;
-  --muted-soft: #6b6e76;
-  --muted-subtle: #5a5d65;
-  --muted-icon: #7a7d85;
-  --muted-path: #6e727a;
-  --muted-settings: #7b7e86;
-  --accent: #7c6bf5;
+  --window: oklch(21% 0.012 270);
+  --sidebar: oklch(24% 0.014 270);
+  --main: oklch(23% 0.012 270);
+  --surface: oklch(30% 0.014 270);
+  --surface-muted: oklch(26% 0.012 270);
+  --line: oklch(36% 0.018 270);
+  --line-strong: oklch(44% 0.022 270);
+  --text: oklch(84% 0.018 270);
+  --text-strong: oklch(96% 0.012 270);
+  --muted: oklch(70% 0.03 270);
+  --muted-strong: oklch(79% 0.032 270);
+  --muted-soft: oklch(63% 0.03 270);
+  --muted-subtle: oklch(55% 0.026 270);
+  --muted-icon: oklch(76% 0.048 270);
+  --muted-path: oklch(65% 0.03 270);
+  --muted-settings: oklch(68% 0.03 270);
+  --accent: oklch(72% 0.15 275);
+  --icon: var(--muted-icon);
+  --icon-strong: oklch(94% 0.02 270);
+  --icon-active: oklch(78% 0.16 275);
   --error: #e05467;
   --error-ink: #f87171;
   --border: var(--line);

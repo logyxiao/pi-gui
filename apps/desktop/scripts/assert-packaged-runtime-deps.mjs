@@ -13,10 +13,6 @@ const requiredPackages = [
   "@smithy/is-array-buffer",
   "@smithy/util-buffer-from",
   "@smithy/util-utf8",
-  "@xterm/addon-clipboard",
-  "@xterm/addon-fit",
-  "@xterm/addon-web-links",
-  "@xterm/xterm",
   "ansi-regex",
   "balanced-match",
   "brace-expansion",
@@ -48,7 +44,13 @@ const pnpmBinary = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 const piCodingAgentPackageName = "@earendil-works/pi-coding-agent";
 const requiredPiCodingAgentVersion = "0.74.0";
 const packagedRuntimeImportChecks = [
+  ["@earendil-works", "pi-ai", "dist", "providers", "anthropic.js"],
+  ["@earendil-works", "pi-ai", "dist", "providers", "azure-openai-responses.js"],
   ["@earendil-works", "pi-ai", "dist", "providers", "google.js"],
+  ["@earendil-works", "pi-ai", "dist", "providers", "google-vertex.js"],
+  ["@earendil-works", "pi-ai", "dist", "providers", "mistral.js"],
+  ["@earendil-works", "pi-ai", "dist", "providers", "openai-completions.js"],
+  ["@earendil-works", "pi-ai", "dist", "providers", "openai-responses.js"],
   ["@earendil-works", "pi-ai", "dist", "bedrock-provider.js"],
   ["cli-highlight", "dist", "index.js"],
   ["proxy-agent", "dist", "index.js"],

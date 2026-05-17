@@ -570,7 +570,7 @@
   border: 1px solid #dfe4ee;
   border-radius: 9px;
   background: #fff;
-  color: var(--muted-strong);
+  color: var(--icon);
   font-size: 17px;
   font-weight: 520;
   line-height: 1;
@@ -580,7 +580,7 @@
 .model-manager__icon-button:focus-visible {
   border-color: #cfd8e8;
   background: #f4f7fb;
-  color: var(--text-strong);
+  color: var(--icon-strong);
   outline: none;
 }
 
@@ -1237,7 +1237,7 @@
   width: 16px;
   height: 16px;
   flex: 0 0 auto;
-  color: var(--muted-soft);
+  color: var(--icon);
 }
 
 .extension-dock__chevron svg {
@@ -1351,4 +1351,3 @@
   justify-content: flex-end;
   gap: 8px;
 }
-

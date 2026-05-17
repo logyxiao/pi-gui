@@ -58,8 +58,8 @@
   height: 8px;
   flex: 0 0 auto;
   margin-right: 3px;
-  border-right: 1.5px solid var(--muted-soft);
-  border-bottom: 1.5px solid var(--muted-soft);
+  border-right: 1.5px solid var(--icon);
+  border-bottom: 1.5px solid var(--icon);
   transform: translateY(-2px) rotate(45deg);
 }
 
@@ -85,7 +85,7 @@
 .searchable-select__search-icon {
   width: 24px;
   margin-right: -24px;
-  color: var(--muted-soft);
+  color: var(--icon);
   font-size: 15px;
   text-align: center;
   pointer-events: none;

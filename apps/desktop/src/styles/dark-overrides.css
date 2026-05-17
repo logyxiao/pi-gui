@@ -212,6 +212,11 @@
   background: var(--surface);
 }
 
+:root.dark .queued-composer-attachment__icon,
+:root.dark .composer-attachment__icon {
+  color: var(--icon);
+}
+
 :root.dark .slash-menu {
   border-color: var(--line);
   background: rgba(43, 45, 49, 0.98);
@@ -413,6 +418,44 @@
 :root.dark .extension-dialog__option:focus-visible {
   border-color: var(--line-strong);
   background: var(--surface);
+}
+
+:root.dark .model-manager__providers,
+:root.dark .model-manager__config,
+:root.dark .model-manager__models-panel,
+:root.dark .model-manager__provider,
+:root.dark .settings-catalog__item,
+:root.dark .settings-catalog__meta-item,
+:root.dark .settings-catalog__subsection,
+:root.dark .model-manager-dialog__panel {
+  border-color: var(--line);
+  background: var(--surface);
+}
+
+:root.dark .model-manager__provider--active,
+:root.dark .model-manager__provider:hover,
+:root.dark .settings-catalog__item:hover,
+:root.dark .settings-catalog__item:focus-visible,
+:root.dark .settings-catalog__item--active {
+  border-color: var(--line-strong);
+  background: var(--surface-muted);
+}
+
+:root.dark .model-manager__icon-button {
+  border-color: color-mix(in oklch, var(--icon) 38%, transparent);
+  background: transparent;
+  color: var(--icon-strong);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--icon) 8%, transparent);
+}
+
+:root.dark .model-manager__icon-button:hover,
+:root.dark .model-manager__icon-button:focus-visible {
+  border-color: color-mix(in oklch, var(--icon-active) 72%, var(--line-strong));
+  background: color-mix(in oklch, var(--icon-active) 16%, transparent);
+  color: var(--icon-active);
+  box-shadow:
+    0 0 0 3px color-mix(in oklch, var(--icon-active) 13%, transparent),
+    inset 0 0 0 1px color-mix(in oklch, var(--icon-active) 12%, transparent);
 }
 
 :root.dark .tree-modal {
