@@ -470,12 +470,14 @@ function ChangeSection({
           <span className="diff-panel__section-count">{files.length}</span>
         </button>
         <button
+          aria-label={actionLabel}
           className="diff-panel__section-action"
           type="button"
           onClick={onActionAll}
           disabled={files.length === 0}
+          title={actionLabel}
         >
-          {actionLabel}
+          {group === "staged" ? <MinusIcon /> : <PlusIcon />}
         </button>
       </div>
       {isExpanded ? (

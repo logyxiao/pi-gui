@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MutableRefObject, type RefCallback, type RefObject } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MutableRefObject, type RefCallback, type RefObject } from "react";
 import type { TranscriptMessage } from "./desktop-state";
 import { ThreadSearchBar } from "./thread-search";
 import { TimelineItem } from "./timeline-item";
@@ -43,7 +43,7 @@ interface ConversationTimelineProps {
   readonly onViewFileInDiff?: (path: string) => void;
 }
 
-export function ConversationTimeline({
+function ConversationTimelineComponent({
   transcript,
   isTranscriptLoading,
   timelinePaneRef,
@@ -312,6 +312,8 @@ export function ConversationTimeline({
   );
 }
 
+export const ConversationTimeline = memo(ConversationTimelineComponent);
+
 function VirtualizedTranscriptList({
   transcript,
   timelinePaneRef,
@@ -414,7 +416,7 @@ function VirtualizedTranscriptList({
   );
 }
 
-function MeasuredTimelineItem({
+const MeasuredTimelineItem = memo(function MeasuredTimelineItem({
   item,
   className,
   top,
@@ -469,7 +471,7 @@ function MeasuredTimelineItem({
       />
     </div>
   );
-}
+});
 
 function ConversationTimelineNav({
   activeItemId,

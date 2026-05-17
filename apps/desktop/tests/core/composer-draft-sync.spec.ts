@@ -6,6 +6,7 @@ import {
   launchDesktop,
   makeUserDataDir,
   makeWorkspace,
+  seedTranscriptMessages,
 } from "../helpers/electron-app";
 
 test("ignores stale persisted draft acknowledgements while typing", async () => {
@@ -91,6 +92,54 @@ test("applies explicit editor text replacements from the session host", async ()
     });
 
     await expect(composer).toHaveValue("remote replacement");
+  } finally {
+    await harness.close();
+  }
+});
+
+test("keeps the rendered transcript out of the composer typing path", async () => {
+  test.setTimeout(60_000);
+  const userDataDir = await makeUserDataDir();
+  const workspacePath = await makeWorkspace("composer-transcript-render-isolation");
+  const harness = await launchDesktop(userDataDir, {
+    initialWorkspaces: [workspacePath],
+    testMode: "background",
+  });
+
+  try {
+    const window = await harness.firstWindow();
+    await createNamedThread(window, "Composer render isolation");
+    await seedTranscriptMessages(harness, window, { count: 8 });
+    await expect(window.getByTestId("transcript")).toContainText("seeded transcript row 7");
+
+    await window.evaluate(() => {
+      const transcript = document.querySelector<HTMLElement>("[data-testid='transcript']");
+      if (!transcript) {
+        throw new Error("Transcript was unavailable");
+      }
+      window.__composerRenderIsolationCount = 0;
+      const observer = new MutationObserver(() => {
+        window.__composerRenderIsolationCount = (window.__composerRenderIsolationCount ?? 0) + 1;
+      });
+      observer.observe(transcript, {
+        attributes: true,
+        characterData: true,
+        childList: true,
+        subtree: true,
+      });
+      window.__composerRenderIsolationObserver = observer;
+    });
+
+    const composer = window.getByTestId("composer");
+    await composer.fill("typing should stay local to the composer");
+    await expect(composer).toHaveValue("typing should stay local to the composer");
+    await window.waitForTimeout(100);
+
+    const mutationCount = await window.evaluate(() => {
+      window.__composerRenderIsolationObserver?.disconnect();
+      return window.__composerRenderIsolationCount ?? 0;
+    });
+    expect(mutationCount).toBe(0);
   } finally {
     await harness.close();
   }

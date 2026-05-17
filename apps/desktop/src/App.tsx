@@ -1270,6 +1270,29 @@ export default function App({
     });
   }, [requestPinnedBottomAlignment]);
 
+  const handleTimelineScroll = useCallback(() => {
+    const pane = timelinePaneRef.current;
+    if (!pane) {
+      return;
+    }
+
+    const pinned = isNearBottom(pane);
+    if (preserveBottomOnNextPaneResizeRef.current && !pinned) {
+      return;
+    }
+
+    pinnedToBottomRef.current = pinned;
+    lastTimelineScrollTopBySessionRef.current.set(selectedSessionKey, pane.scrollTop);
+    lastTimelinePinnedBySessionRef.current.set(selectedSessionKey, pinned);
+    if (pinned) {
+      setShowJumpToLatest(false);
+    }
+  }, [selectedSessionKey]);
+
+  const jumpToLatest = useCallback(() => {
+    requestPinnedBottomAlignment("smooth", { preferExactRestore: true });
+  }, [requestPinnedBottomAlignment]);
+
   if (!api || !snapshot) {
     return (
       <div className="shell shell--loading">
@@ -1769,29 +1792,6 @@ export default function App({
       setNewThreadThinkingLevel(undefined);
       setNewThreadEnvironment("local");
     });
-  };
-
-  const handleTimelineScroll = () => {
-    const pane = timelinePaneRef.current;
-    if (!pane) {
-      return;
-    }
-
-    const pinned = isNearBottom(pane);
-    if (preserveBottomOnNextPaneResizeRef.current && !pinned) {
-      return;
-    }
-
-    pinnedToBottomRef.current = pinned;
-    lastTimelineScrollTopBySessionRef.current.set(selectedSessionKey, pane.scrollTop);
-    lastTimelinePinnedBySessionRef.current.set(selectedSessionKey, pinned);
-    if (pinned) {
-      setShowJumpToLatest(false);
-    }
-  };
-
-  const jumpToLatest = () => {
-    requestPinnedBottomAlignment("smooth", { preferExactRestore: true });
   };
 
   const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
