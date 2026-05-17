@@ -291,7 +291,9 @@ function parseUsageScript(script: string | undefined): ParsedUsageScript | undef
       headers[match[1] ?? ""] = match[2] ?? "";
     }
   }
-  const extractorMatch = /extractor\s*:\s*(function\s*\([^)]*\)\s*\{[\s\S]*?\n\s*\})\s*[,}]\s*/.exec(script);
+  const extractorMatch =
+    /extractor(?:Path)?\s*:\s*["'`]([^"'`]+)["'`]/.exec(script) ??
+    /path\s*:\s*["'`]([^"'`]+)["'`]/.exec(script);
   return { request: { url, ...(method ? { method } : {}), ...(Object.keys(headers).length > 0 ? { headers } : {}), ...(body ? { body } : {}) }, ...(extractorMatch?.[1] ? { extractor: extractorMatch[1] } : {}) };
 }
 
@@ -304,12 +306,32 @@ function interpolateUsageTemplate(template: string, baseUrl: string, apiKey: str
 }
 
 function runUsageExtractor(extractor: string, response: unknown): unknown {
-  try {
-    const fn = new Function("response", `return (${extractor})(response);`) as (response: unknown) => unknown;
-    return fn(response);
-  } catch {
-    return undefined;
+  return readJsonPath(response, extractor);
+}
+
+function readJsonPath(value: unknown, path: string): unknown {
+  const parts = path
+    .trim()
+    .replace(/^\$\.?/, "")
+    .split(/[.[\]]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  let current = value;
+  for (const part of parts) {
+    if (Array.isArray(current)) {
+      const index = Number(part);
+      if (!Number.isInteger(index) || index < 0 || index >= current.length) {
+        return undefined;
+      }
+      current = current[index];
+      continue;
+    }
+    if (!current || typeof current !== "object") {
+      return undefined;
+    }
+    current = (current as Record<string, unknown>)[part];
   }
+  return current;
 }
 
 function summarizeUsageResult(result: unknown): string {

@@ -332,7 +332,7 @@ export interface PiDesktopApi {
     callback: (status: DesktopNotificationPermissionStatus) => void,
   ): () => void;
   pickComposerAttachments(): Promise<DesktopAppState>;
-  readClipboardImage(): ComposerImageAttachment | null;
+  readClipboardImage(): Promise<ComposerImageAttachment | null>;
   addComposerAttachments(attachments: readonly ComposerAttachment[]): Promise<DesktopAppState>;
   removeComposerAttachment(attachmentId: string): Promise<DesktopAppState>;
   editQueuedComposerMessage(messageId: string, currentDraft?: string): Promise<DesktopAppState>;

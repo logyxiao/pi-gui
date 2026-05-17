@@ -709,9 +709,7 @@ app.whenReady().then(async () => {
     const attachments = await Promise.all(result.filePaths.map(readComposerAttachment));
     return store.addComposerAttachments(attachments);
   });
-  ipcMain.on(desktopIpc.readClipboardImage, (event) => {
-    event.returnValue = readClipboardImageAttachment();
-  });
+  ipcMain.handle(desktopIpc.readClipboardImage, () => readClipboardImageAttachment());
   ipcMain.handle(desktopIpc.addComposerAttachments, (_event, attachments: readonly ComposerAttachment[]) => {
     const validated = attachments.flatMap(validateComposerAttachmentPayload);
     return store.addComposerAttachments(validated);

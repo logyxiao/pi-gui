@@ -16,7 +16,7 @@ import type { ModelOnboardingState, ModelOnboardingSettingsSection } from "./mod
 import { ModelSelector } from "./model-selector";
 import type { ExtensionDockModel } from "./extension-session-ui";
 
-interface ComposerPanelProps {
+export interface ComposerPanelProps {
   readonly selectedSession: SessionRecord;
   readonly lastError?: string;
   readonly runtime?: RuntimeSnapshot;

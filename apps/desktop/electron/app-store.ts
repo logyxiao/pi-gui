@@ -1,5 +1,4 @@
 import type { BrowserWindow } from "electron";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   applyHostUiRequestToExtensionUiState,
@@ -94,6 +93,16 @@ import { GitWorktreeManager } from "./worktree-manager";
 import * as workspace from "./app-store-workspace";
 import * as worktree from "./app-store-worktree";
 import * as composer from "./app-store-composer";
+import * as runtime from "./app-store-runtime";
+import {
+  applyModelSettingsSnapshot,
+  hasStoredModelSettings,
+  mergeEnabledModelPatterns,
+  mergeModelSettingsSnapshot,
+  modelSettingsEqual,
+  readProjectModelSettingsFile,
+  updateProjectModelSettingsFile,
+} from "./app-store-model-settings";
 import { isSessionActivelyViewed } from "./session-visibility";
 
 type StateListener = (state: DesktopAppState) => void;
@@ -522,138 +531,52 @@ export class DesktopAppStore implements AppStoreInternals {
   /* ── Runtime / model / provider settings ───────────────── */
 
   async refreshRuntime(workspaceId?: string): Promise<DesktopAppState> {
-    await this.initialize();
-    const resolvedWorkspaceId = workspaceId || this.state.selectedWorkspaceId;
-    const ws = this.workspaceRefFromState(resolvedWorkspaceId);
-    if (!ws) {
-      return this.emit();
-    }
-
-    return this.withErrorHandling(async () => {
-      const snapshot = await this.driver.runtimeSupervisor.refreshRuntime(ws);
-      this.runtimeByWorkspace.set(ws.workspaceId, snapshot);
-      this.clearExtensionUiForWorkspace(ws.workspaceId);
-      await this.reloadSessionsForWorkspace(ws.workspaceId);
-      await this.refreshSessionCommandsForWorkspace(ws.workspaceId);
-      return this.refreshState({ clearLastError: true });
-    });
+    return runtime.refreshRuntime(this, workspaceId);
   }
 
   async setSessionModel(target: WorkspaceSessionTarget, provider: string, modelId: string): Promise<DesktopAppState> {
-    return composer.setSessionModel(this, target, provider, modelId);
+    return runtime.setSessionModel(this, target, provider, modelId);
   }
 
   async setDefaultModel(workspaceId: string, provider: string, modelId: string): Promise<DesktopAppState> {
-    const targetWorkspaceId = this.resolveModelSettingsWorkspaceId(workspaceId);
-    if (this.state.modelSettingsScopeMode !== "per-repo") {
-      return this.withRuntimeUpdate(targetWorkspaceId, (ws) =>
-        this.driver.runtimeSupervisor.setDefaultModel(ws, { provider, modelId }),
-      );
-    }
-    await this.initialize();
-    const ws = this.workspaceRefFromState(targetWorkspaceId);
-    if (!ws) {
-      return this.withError(`Unknown workspace: ${targetWorkspaceId}`);
-    }
-    return this.withErrorHandling(async () => {
-      await updateProjectModelSettingsFile(ws.path, (settings) => ({
-        ...settings,
-        defaultProvider: provider,
-        defaultModel: modelId,
-      }));
-      return this.refreshState({ clearLastError: true });
-    });
+    return runtime.setDefaultModel(this, workspaceId, provider, modelId);
   }
 
   async setDefaultThinkingLevel(
     workspaceId: string,
     thinkingLevel: RuntimeSettingsSnapshot["defaultThinkingLevel"],
   ): Promise<DesktopAppState> {
-    const targetWorkspaceId = this.resolveModelSettingsWorkspaceId(workspaceId);
-    if (this.state.modelSettingsScopeMode !== "per-repo") {
-      return this.withRuntimeUpdate(targetWorkspaceId, (ws) =>
-        this.driver.runtimeSupervisor.setDefaultThinkingLevel(ws, thinkingLevel),
-      );
-    }
-    await this.initialize();
-    const ws = this.workspaceRefFromState(targetWorkspaceId);
-    if (!ws) {
-      return this.withError(`Unknown workspace: ${targetWorkspaceId}`);
-    }
-    return this.withErrorHandling(async () => {
-      await updateProjectModelSettingsFile(ws.path, (settings) => ({
-        ...settings,
-        ...(thinkingLevel ? { defaultThinkingLevel: thinkingLevel } : {}),
-      }));
-      return this.refreshState({ clearLastError: true });
-    });
+    return runtime.setDefaultThinkingLevel(this, workspaceId, thinkingLevel);
   }
 
   async setSessionThinkingLevel(
     sessionRef: SessionRef,
     thinkingLevel: NonNullable<RuntimeSettingsSnapshot["defaultThinkingLevel"]>,
   ): Promise<DesktopAppState> {
-    return composer.setSessionThinkingLevel(this, sessionRef, thinkingLevel);
+    return runtime.setSessionThinkingLevel(this, sessionRef, thinkingLevel);
   }
 
   async loginProvider(workspaceId: string, providerId: string, callbacks: RuntimeLoginCallbacks): Promise<DesktopAppState> {
-    await this.initialize();
-    const targetWorkspaceId = this.resolveModelSettingsWorkspaceId(workspaceId);
-    const ws = this.workspaceRefFromState(workspaceId);
-    if (!ws) {
-      return this.withError(`Unknown workspace: ${workspaceId}`);
-    }
-
-    return this.withErrorHandling(async () => {
-      const snapshot = await this.driver.runtimeSupervisor.login(ws, providerId, callbacks);
-      this.runtimeByWorkspace.set(workspaceId, snapshot);
-      await this.autoEnableModelsForConnectedProvider(targetWorkspaceId, providerId, snapshot);
-      await this.refreshSessionCommandsForWorkspace(workspaceId);
-      return this.refreshState({ clearLastError: true });
-    });
+    return runtime.loginProvider(this, workspaceId, providerId, callbacks);
   }
 
   async logoutProvider(workspaceId: string, providerId: string): Promise<DesktopAppState> {
-    return this.withRuntimeUpdate(workspaceId, (ws) =>
-      this.driver.runtimeSupervisor.logout(ws, providerId),
-    );
+    return runtime.logoutProvider(this, workspaceId, providerId);
   }
 
   async setProviderApiKey(workspaceId: string, providerId: string, apiKey: string): Promise<DesktopAppState> {
-    return this.withRuntimeUpdate(workspaceId, (ws) =>
-      this.driver.runtimeSupervisor.setProviderApiKey(ws, providerId, apiKey),
-    );
+    return runtime.setProviderApiKey(this, workspaceId, providerId, apiKey);
   }
 
   async setEnableSkillCommands(workspaceId: string, enabled: boolean): Promise<DesktopAppState> {
-    return this.withRuntimeUpdate(workspaceId, (ws) =>
-      this.driver.runtimeSupervisor.setEnableSkillCommands(ws, enabled),
-      { reloadSessions: true },
-    );
+    return runtime.setEnableSkillCommands(this, workspaceId, enabled);
   }
 
   async setScopedModelPatterns(workspaceId: string, patterns: readonly string[]): Promise<DesktopAppState> {
-    const targetWorkspaceId = this.resolveModelSettingsWorkspaceId(workspaceId);
-    if (this.state.modelSettingsScopeMode !== "per-repo") {
-      return this.withRuntimeUpdate(targetWorkspaceId, (ws) =>
-        this.driver.runtimeSupervisor.setScopedModelPatterns(ws, patterns),
-      );
-    }
-    await this.initialize();
-    const ws = this.workspaceRefFromState(targetWorkspaceId);
-    if (!ws) {
-      return this.withError(`Unknown workspace: ${targetWorkspaceId}`);
-    }
-    return this.withErrorHandling(async () => {
-      await updateProjectModelSettingsFile(ws.path, (settings) => ({
-        ...settings,
-        enabledModels: patterns.length > 0 ? [...patterns] : undefined,
-      }));
-      return this.refreshState({ clearLastError: true });
-    });
+    return runtime.setScopedModelPatterns(this, workspaceId, patterns);
   }
 
-  private async autoEnableModelsForConnectedProvider(
+  async autoEnableModelsForConnectedProvider(
     workspaceId: string,
     providerId: string,
     snapshot: RuntimeSnapshot,
@@ -698,20 +621,14 @@ export class DesktopAppStore implements AppStoreInternals {
   }
 
   async setSkillEnabled(workspaceId: string, filePath: string, enabled: boolean): Promise<DesktopAppState> {
-    return this.withRuntimeUpdate(workspaceId, (ws) =>
-      this.driver.runtimeSupervisor.setSkillEnabled(ws, filePath, enabled),
-      { reloadSessions: true },
-    );
+    return runtime.setSkillEnabled(this, workspaceId, filePath, enabled);
   }
 
   async setExtensionEnabled(workspaceId: string, filePath: string, enabled: boolean): Promise<DesktopAppState> {
-    return this.withRuntimeUpdate(workspaceId, (ws) =>
-      this.driver.runtimeSupervisor.setExtensionEnabled(ws, filePath, enabled),
-      { reloadSessions: true },
-    );
+    return runtime.setExtensionEnabled(this, workspaceId, filePath, enabled);
   }
 
-  private async withRuntimeUpdate(
+  async withRuntimeUpdate(
     workspaceId: string,
     action: (ws: WorkspaceRef) => Promise<RuntimeSnapshot>,
     options?: {
@@ -1203,17 +1120,17 @@ export class DesktopAppStore implements AppStoreInternals {
     this.state = this.syncDerivedSessionState(this.state, sessionRef);
   }
 
-  private async refreshSessionCommandsForWorkspace(workspaceId: string): Promise<void> {
+  async refreshSessionCommandsForWorkspace(workspaceId: string): Promise<void> {
     const sessionRefs = this.sessionRefsForWorkspace(workspaceId);
     await Promise.all(sessionRefs.map((sessionRef) => this.refreshSessionCommands(sessionRef)));
   }
 
-  private async reloadSessionsForWorkspace(workspaceId: string): Promise<void> {
+  async reloadSessionsForWorkspace(workspaceId: string): Promise<void> {
     const sessionRefs = this.sessionRefsForWorkspace(workspaceId);
     await Promise.all(sessionRefs.map((sessionRef) => this.driver.reloadSession(sessionRef)));
   }
 
-  private clearExtensionUiForWorkspace(workspaceId: string): void {
+  clearExtensionUiForWorkspace(workspaceId: string): void {
     for (const sessionRef of this.sessionRefsForWorkspace(workspaceId)) {
       this.clearExtensionUiForSession(sessionRef);
     }
@@ -1455,7 +1372,7 @@ export class DesktopAppStore implements AppStoreInternals {
     };
   }
 
-  private resolveModelSettingsWorkspaceId(workspaceId: string): string {
+  resolveModelSettingsWorkspaceId(workspaceId: string): string {
     if (this.state.modelSettingsScopeMode !== "per-repo") {
       return workspaceId;
     }
@@ -2291,107 +2208,6 @@ function updateRecordValue<T>(
   };
 }
 
-function applyModelSettingsSnapshot(
-  runtime: RuntimeSnapshot,
-  settings: ModelSettingsSnapshot,
-): RuntimeSnapshot {
-  return {
-    ...runtime,
-    settings: {
-      ...runtime.settings,
-      ...(settings.defaultProvider ? { defaultProvider: settings.defaultProvider } : { defaultProvider: undefined }),
-      ...(settings.defaultModelId ? { defaultModelId: settings.defaultModelId } : { defaultModelId: undefined }),
-      ...(settings.defaultThinkingLevel
-        ? { defaultThinkingLevel: settings.defaultThinkingLevel }
-        : { defaultThinkingLevel: undefined }),
-      enabledModelPatterns: [...settings.enabledModelPatterns],
-    },
-  };
-}
-
-async function readProjectModelSettingsFile(workspacePath: string): Promise<Record<string, unknown>> {
-  try {
-    const raw = await readFile(join(workspacePath, ".pi", "settings.json"), "utf8");
-    const parsed = JSON.parse(raw);
-    return typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : {};
-  } catch {
-    return {};
-  }
-}
-
-async function updateProjectModelSettingsFile(
-  workspacePath: string,
-  updater: (settings: Record<string, unknown>) => Record<string, unknown>,
-): Promise<void> {
-  const current = await readProjectModelSettingsFile(workspacePath);
-  const next = updater({ ...current });
-  const configDir = join(workspacePath, ".pi");
-  await mkdir(configDir, { recursive: true });
-  await writeFile(join(configDir, "settings.json"), `${JSON.stringify(next, null, 2)}\n`, "utf8");
-}
-
-function mergeModelSettingsSnapshot(
-  globalSettings: ModelSettingsSnapshot,
-  projectSettings: Record<string, unknown>,
-): ModelSettingsSnapshot {
-  const defaultProvider =
-    typeof projectSettings.defaultProvider === "string"
-      ? projectSettings.defaultProvider
-      : globalSettings.defaultProvider;
-  const defaultModelId =
-    typeof projectSettings.defaultModel === "string"
-      ? projectSettings.defaultModel
-      : globalSettings.defaultModelId;
-  const defaultThinkingLevel =
-    typeof projectSettings.defaultThinkingLevel === "string"
-      ? (projectSettings.defaultThinkingLevel as RuntimeSettingsSnapshot["defaultThinkingLevel"])
-      : globalSettings.defaultThinkingLevel;
-
-  return {
-    enabledModelPatterns: Array.isArray(projectSettings.enabledModels)
-      ? projectSettings.enabledModels.filter((value): value is string => typeof value === "string")
-      : [...globalSettings.enabledModelPatterns],
-    ...(defaultProvider ? { defaultProvider } : {}),
-    ...(defaultModelId ? { defaultModelId } : {}),
-    ...(defaultThinkingLevel ? { defaultThinkingLevel } : {}),
-  };
-}
-
-function hasStoredModelSettings(settings: ModelSettingsSnapshot | undefined): settings is ModelSettingsSnapshot {
-  return Boolean(
-    settings &&
-      (settings.enabledModelPatterns.length > 0 ||
-        settings.defaultProvider ||
-        settings.defaultModelId ||
-        settings.defaultThinkingLevel),
-  );
-}
-
-function modelSettingsEqual(left: ModelSettingsSnapshot, right: ModelSettingsSnapshot): boolean {
-  return (
-    left.defaultProvider === right.defaultProvider &&
-    left.defaultModelId === right.defaultModelId &&
-    left.defaultThinkingLevel === right.defaultThinkingLevel &&
-    left.enabledModelPatterns.length === right.enabledModelPatterns.length &&
-    left.enabledModelPatterns.every((pattern, index) => pattern === right.enabledModelPatterns[index])
-  );
-}
-
-function mergeEnabledModelPatterns(
-  existingPatterns: readonly string[],
-  providerPatterns: readonly string[],
-): readonly string[] {
-  const merged = [...existingPatterns];
-  const seen = new Set(existingPatterns);
-  for (const pattern of providerPatterns) {
-    if (seen.has(pattern)) {
-      continue;
-    }
-    seen.add(pattern);
-    merged.push(pattern);
-  }
-  return merged;
-}
 
 function formatCapabilityLabel(capability: string): string {
   switch (capability) {

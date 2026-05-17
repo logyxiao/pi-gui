@@ -1,6 +1,11 @@
 import type { PiSdkDriver, JsonCatalogStore } from "@pi-gui/pi-sdk-driver";
 import type { CreateSessionOptions, SessionConfig, SessionRef, SessionSnapshot, WorkspaceRef } from "@pi-gui/session-driver";
-import type { RuntimeCommandRecord, RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
+import type {
+  RuntimeCommandRecord,
+  RuntimeLoginCallbacks,
+  RuntimeSettingsSnapshot,
+  RuntimeSnapshot,
+} from "@pi-gui/session-driver/runtime-types";
 import type {
   AppView,
   ComposerAttachment,
@@ -43,6 +48,12 @@ export interface AppStoreInternals {
   withErrorHandling(fn: () => Promise<DesktopAppState>): Promise<DesktopAppState>;
   selectSessionFast(target: WorkspaceSessionTarget): Promise<DesktopAppState>;
   workspaceRefFromState(workspaceId: string): WorkspaceRef | undefined;
+  resolveModelSettingsWorkspaceId(workspaceId: string): string;
+  withRuntimeUpdate(
+    workspaceId: string,
+    action: (ws: WorkspaceRef) => Promise<RuntimeSnapshot>,
+    options?: { readonly reloadSessions?: boolean },
+  ): Promise<DesktopAppState>;
   selectedSessionRef(): SessionRef | undefined;
   getExtensionFilePath(workspaceId: string, filePath: string): string | undefined;
   sessionFromState(sessionRef: SessionRef): { archivedAt?: string; updatedAt: string; title: string; status: string } | undefined;
@@ -57,6 +68,7 @@ export interface AppStoreInternals {
   beginRuntimeCommandExecution(sessionRef: SessionRef, command: RuntimeCommandRecord): void;
   finishRuntimeCommandExecution(sessionRef: SessionRef, timestamp?: string): PendingRuntimeCommandExecution | undefined;
   clearExtensionUiForSession(sessionRef: SessionRef): void;
+  clearExtensionUiForWorkspace(workspaceId: string): void;
   cancelPendingDialogsForSession(sessionRef: SessionRef): Promise<void>;
   persistUiState(): Promise<void>;
   persistComposerAttachments(key: string, attachments: readonly ComposerAttachment[]): Promise<void>;
@@ -74,10 +86,20 @@ export interface AppStoreInternals {
   setQueuedComposerEditState(sessionRef: SessionRef, editState: QueuedComposerEditState | undefined): void;
   getQueuedComposerEditState(sessionRef: SessionRef): QueuedComposerEditState | undefined;
   reloadTranscriptFromDriver(sessionRef: SessionRef): Promise<void>;
+  reloadSessionsForWorkspace(workspaceId: string): Promise<void>;
   publishSelectedTranscript(): void;
   publishSelectedTranscriptFor(sessionRef: SessionRef): void;
   buildCreateSessionOptions(workspaceId: string): Promise<CreateSessionOptions | undefined>;
+  refreshSessionCommandsForWorkspace(workspaceId: string): Promise<void>;
+  autoEnableModelsForConnectedProvider(
+    workspaceId: string,
+    providerId: string,
+    snapshot: RuntimeSnapshot,
+  ): Promise<void>;
 }
+
+export type StoreRuntimeLoginCallbacks = RuntimeLoginCallbacks;
+export type StoreRuntimeThinkingLevel = RuntimeSettingsSnapshot["defaultThinkingLevel"];
 
 export interface RefreshStateOptions {
   readonly selectedWorkspaceId?: string;

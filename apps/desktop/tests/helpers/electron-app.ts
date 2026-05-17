@@ -48,6 +48,7 @@ export interface DesktopHarness {
   electronApp: ElectronApplication;
   firstWindow(): Promise<Page>;
   focusWindow(): Promise<void>;
+  getRendererErrors(): readonly string[];
   close(): Promise<void>;
 }
 
@@ -151,14 +152,28 @@ async function launchDesktopExecutable(
 
 function createDesktopHarness(electronApp: ElectronApplication): DesktopHarness {
   let page: Page | undefined;
+  const rendererErrors: string[] = [];
 
   async function getWindow(): Promise<Page> {
     if (!page) {
       page = await electronApp.firstWindow();
-      await page.waitForLoadState("domcontentloaded");
-      await page.waitForFunction(() => Boolean((window as PiAppWindow).piApp), undefined, {
-        timeout: 15_000,
+      page.on("pageerror", (error) => {
+        rendererErrors.push(error.stack || error.message);
       });
+      page.on("console", (message) => {
+        if (message.type() === "error") {
+          rendererErrors.push(message.text());
+        }
+      });
+      await page.waitForLoadState("domcontentloaded");
+      try {
+        await page.waitForFunction(() => Boolean((window as PiAppWindow).piApp), undefined, {
+          timeout: 15_000,
+        });
+      } catch (error) {
+        const diagnostic = await collectRendererReadyDiagnostic(page);
+        throw new Error(`Desktop renderer did not expose piApp before timeout: ${diagnostic}`, { cause: error });
+      }
     }
     return page;
   }
@@ -185,10 +200,24 @@ function createDesktopHarness(electronApp: ElectronApplication): DesktopHarness 
         )
         .toBe(true);
     },
+    getRendererErrors: () => [...rendererErrors],
     close: async () => {
       await electronApp.close();
     },
   };
+}
+
+async function collectRendererReadyDiagnostic(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const bodyText = document.body?.innerText?.trim().slice(0, 300) ?? "";
+    return JSON.stringify({
+      url: location.href,
+      title: document.title,
+      readyState: document.readyState,
+      hasPiApp: Boolean((window as PiAppWindow).piApp),
+      bodyText,
+    });
+  }).catch((error) => `diagnostic unavailable: ${error instanceof Error ? error.message : String(error)}`);
 }
 
 function buildDesktopLaunchEnv(

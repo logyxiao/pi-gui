@@ -14,8 +14,6 @@ import {
   type WorktreeRecord,
   type WorkspaceRecord,
 } from "./desktop-state";
-import { formatRelativeTime } from "./string-utils";
-import { ComposerPanel } from "./composer-panel";
 import { DiffPanel, type DiffPanelFileRequest } from "./diff-panel";
 import { buildModelOptions } from "./composer-commands";
 import { parseTreeComposerCommand } from "./composer-commands";
@@ -35,7 +33,6 @@ import { Sidebar } from "./sidebar";
 import { SidebarToggleButton } from "./sidebar-toggle-button";
 import { Topbar } from "./topbar";
 import { TerminalPanel } from "./terminal-panel";
-import { ConversationTimeline } from "./conversation-timeline";
 import { useSlashMenu } from "./hooks/use-slash-menu";
 import { useMentionMenu } from "./hooks/use-mention-menu";
 import { useThreadSearch } from "./hooks/use-thread-search";
@@ -43,9 +40,9 @@ import { useTimelineController } from "./hooks/use-timeline-controller";
 import { useWorkspaceMenu } from "./hooks/use-workspace-menu";
 import { useDesktopCommands } from "./hooks/use-desktop-commands";
 import { useComposerController } from "./hooks/use-composer-controller";
-import { buildExtensionDockModel, ExtensionDialog, hasExtensionDockContent } from "./extension-session-ui";
-import { TreeModal } from "./tree-modal";
+import { buildExtensionDockModel, hasExtensionDockContent } from "./extension-session-ui";
 import { ConfirmDialog, type ConfirmDialogProps } from "./confirm-dialog";
+import { ThreadView } from "./thread-view";
 import { getEffectiveModelRuntime } from "./model-settings";
 import { resolveRepoWorkspaceId } from "./workspace-roots";
 import {
@@ -1088,13 +1085,12 @@ export default function App({
       return false;
     }
 
-    const clipboardImage = api?.readClipboardImage();
-    if (!clipboardImage) {
-      return false;
-    }
-
     event.preventDefault();
-    onImage(clipboardImage);
+    void api?.readClipboardImage().then((clipboardImage) => {
+      if (clipboardImage) {
+        onImage(clipboardImage);
+      }
+    });
     return true;
   };
 
@@ -1598,109 +1594,93 @@ export default function App({
             </section>
           )
         ) : selectedWorkspace && selectedSession ? (
-          <>
-            <section className="canvas canvas--thread">
-              <div className="conversation conversation--thread">
-                <div className="chat-header">
-                  <div className="chat-header__eyebrow">
-                    {selectedWorkspace.kind === "worktree"
-                      ? `${rootWorkspace?.name ?? selectedWorkspace.name} · ${selectedWorktree?.name ?? selectedWorkspace.branchName ?? "Worktree"}`
-                      : `${selectedWorkspace.name} · ${t("common.local")}`}
-                  </div>
-                  <div className="chat-header__row">
-                    <h1 className="chat-header__title">{displayedSessionTitle}</h1>
-                    <div className="chat-header__status">
-                      {selectedSession.status === "running" ? runningLabel : formatRelativeTime(selectedSession.updatedAt)}
-                    </div>
-                  </div>
-                </div>
-
-                <ConversationTimeline
-                  transcript={activeTranscript}
-                  isTranscriptLoading={isTranscriptLoading}
-                  timelinePaneRef={timelinePaneRef}
-                  timelinePaneElementRef={setTimelinePaneElement}
-                  disableVirtualization={disableTimelineVirtualization}
-                  onDisableVirtualizationReady={finalizeTimelineVirtualizationDisable}
-                  onTimelineScroll={handleTimelineScroll}
-                  threadSearch={threadSearch}
-                  showJumpToLatest={showJumpToLatest}
-                  onJumpToLatest={jumpToLatest}
-                  onContentHeightChange={handleTimelineContentHeightChange}
-                  onViewFileInDiff={handleViewFileInDiff}
-                />
-              </div>
-            </section>
-            <ComposerPanel
-              key={selectedSessionKey}
-              activeSlashCommand={slashMenu.activeSlashFlow?.command}
-              activeSlashCommandMeta={slashMenu.activeSlashFlow?.command?.description}
-              attachments={composerAttachments}
-              queuedMessages={queuedComposerMessages}
-              editingQueuedMessageId={editingQueuedMessageId}
-              composerDraft={composerDraft}
-              composerRef={composerRef}
-              runtime={selectedModelRuntime}
-              contextUsage={selectedSession.contextUsage}
-              provider={resolvedSessionProvider}
-              modelId={resolvedSessionModelId}
-              thinkingLevel={resolvedSessionThinkingLevel}
-              onClearSlashCommand={slashMenu.resetSlashUi}
-              onComposerKeyDown={handleComposerKeyDown}
-              onComposerPaste={handleComposerPaste}
-              onComposerDrop={handleComposerDrop}
-              onPickAttachments={handlePickAttachments}
-              onRemoveAttachment={handleRemoveAttachment}
-              onEditQueuedMessage={handleEditQueuedMessage}
-              onCancelQueuedEdit={handleCancelQueuedEdit}
-              onRemoveQueuedMessage={handleRemoveQueuedMessage}
-              onSteerQueuedMessage={handleSteerQueuedMessage}
-              onSelectSlashCommand={(command) => {
+          <ThreadView
+            activeDialog={activeExtensionDialog}
+            displayedSessionTitle={displayedSessionTitle}
+            localLabel={t("common.local")}
+            rootWorkspace={rootWorkspace}
+            runningLabel={runningLabel}
+            selectedSession={selectedSession}
+            selectedSessionKey={selectedSessionKey}
+            selectedWorkspace={selectedWorkspace}
+            selectedWorktree={selectedWorktree}
+            onRespondToExtensionDialog={handleRespondToExtensionDialog}
+            timeline={{
+              transcript: activeTranscript,
+              isTranscriptLoading,
+              timelinePaneRef,
+              timelinePaneElementRef: setTimelinePaneElement,
+              disableVirtualization: disableTimelineVirtualization,
+              onDisableVirtualizationReady: finalizeTimelineVirtualizationDisable,
+              onTimelineScroll: handleTimelineScroll,
+              threadSearch,
+              showJumpToLatest,
+              onJumpToLatest: jumpToLatest,
+              onContentHeightChange: handleTimelineContentHeightChange,
+              onViewFileInDiff: handleViewFileInDiff,
+            }}
+            composer={{
+              activeSlashCommand: slashMenu.activeSlashFlow?.command,
+              activeSlashCommandMeta: slashMenu.activeSlashFlow?.command?.description,
+              attachments: composerAttachments,
+              queuedMessages: queuedComposerMessages,
+              editingQueuedMessageId,
+              composerDraft,
+              composerRef,
+              runtime: selectedModelRuntime,
+              provider: resolvedSessionProvider,
+              modelId: resolvedSessionModelId,
+              thinkingLevel: resolvedSessionThinkingLevel,
+              onClearSlashCommand: slashMenu.resetSlashUi,
+              onComposerKeyDown: handleComposerKeyDown,
+              onComposerPaste: handleComposerPaste,
+              onComposerDrop: handleComposerDrop,
+              onPickAttachments: handlePickAttachments,
+              onRemoveAttachment: handleRemoveAttachment,
+              onEditQueuedMessage: handleEditQueuedMessage,
+              onCancelQueuedEdit: handleCancelQueuedEdit,
+              onRemoveQueuedMessage: handleRemoveQueuedMessage,
+              onSteerQueuedMessage: handleSteerQueuedMessage,
+              onSelectSlashCommand: (command) => {
                 slashMenu.applySlashCommandSelection(command, "click");
-              }}
-              onSelectSlashOption={(option) => {
+              },
+              onSelectSlashOption: (option) => {
                 slashMenu.applySlashOptionSelection(option);
-              }}
-              onSetModel={handleSetSessionModel}
-              onSetThinking={handleSetSessionThinking}
-              modelOnboarding={selectedSessionModelOnboarding}
-              onOpenModelSettings={(section) =>
-                openSettings(selectedWorkspace?.rootWorkspaceId ?? selectedWorkspace?.id, section)
-              }
-              onSubmit={submitComposerDraft}
-              runningLabel={runningLabel}
-              selectedSession={selectedSession}
-              lastError={snapshot.lastError}
-              selectedSlashCommand={slashMenu.activeSlashOptionCommand ?? slashMenu.selectedSlashCommand}
-              selectedSlashOption={slashMenu.selectedSlashOption}
-              slashOptionEmptyState={slashMenu.slashOptionEmptyState}
-              setComposerDraft={setComposerDraft}
-              showSlashOptionMenu={slashMenu.showSlashOptionMenu}
-              showSlashMenu={slashMenu.showSlashMenu}
-              slashOptions={slashMenu.slashOptions}
-              slashSections={slashMenu.slashSections}
-              showMentionMenu={mentionMenu.showMentionMenu}
-              mentionOptions={mentionMenu.mentionOptions}
-              selectedMentionIndex={mentionMenu.selectedIndex}
-              onSelectMention={mentionMenu.insertMention}
-              extensionDock={selectedExtensionDock}
-              extensionDockExpanded={isSelectedExtensionDockExpanded}
-              onToggleExtensionDock={handleToggleExtensionDock}
-            />
-            {activeExtensionDialog ? (
-              <ExtensionDialog dialog={activeExtensionDialog} onRespond={handleRespondToExtensionDialog} />
-            ) : null}
-            {treeModalState.open ? (
-              <TreeModal
-                error={treeModalState.error}
-                loading={treeModalState.loading}
-                submitting={treeModalState.submitting}
-                tree={treeModalState.tree}
-                onClose={closeTreeModal}
-                onNavigate={navigateTreeSelection}
-              />
-            ) : null}
-          </>
+              },
+              onSetModel: handleSetSessionModel,
+              onSetThinking: handleSetSessionThinking,
+              modelOnboarding: selectedSessionModelOnboarding,
+              onOpenModelSettings: (section) =>
+                openSettings(selectedWorkspace?.rootWorkspaceId ?? selectedWorkspace?.id, section),
+              onSubmit: submitComposerDraft,
+              runningLabel,
+              lastError: snapshot.lastError,
+              selectedSlashCommand: slashMenu.activeSlashOptionCommand ?? slashMenu.selectedSlashCommand,
+              selectedSlashOption: slashMenu.selectedSlashOption,
+              slashOptionEmptyState: slashMenu.slashOptionEmptyState,
+              setComposerDraft,
+              showSlashOptionMenu: slashMenu.showSlashOptionMenu,
+              showSlashMenu: slashMenu.showSlashMenu,
+              slashOptions: slashMenu.slashOptions,
+              slashSections: slashMenu.slashSections,
+              showMentionMenu: mentionMenu.showMentionMenu,
+              mentionOptions: mentionMenu.mentionOptions,
+              selectedMentionIndex: mentionMenu.selectedIndex,
+              onSelectMention: mentionMenu.insertMention,
+              extensionDock: selectedExtensionDock,
+              extensionDockExpanded: isSelectedExtensionDockExpanded,
+              onToggleExtensionDock: handleToggleExtensionDock,
+            }}
+            treeModal={{
+              open: treeModalState.open,
+              error: treeModalState.error,
+              loading: treeModalState.loading,
+              submitting: treeModalState.submitting,
+              tree: treeModalState.tree,
+              onClose: closeTreeModal,
+              onNavigate: navigateTreeSelection,
+            }}
+          />
         ) : selectedWorkspace ? (
           <section className="canvas canvas--empty">
             <div className="empty-panel">

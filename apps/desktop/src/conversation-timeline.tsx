@@ -7,7 +7,7 @@ const OVERSCAN_PX = 720;
 const ROW_GAP_PX = 14;
 export const VIRTUALIZATION_THRESHOLD = 80;
 
-interface ThreadSearchModel {
+export interface ThreadSearchModel {
   readonly isOpen: boolean;
   readonly query: string;
   readonly matchCount: number;
@@ -28,7 +28,7 @@ export interface ConversationTimelineNavItem {
   readonly ordinal: number;
 }
 
-interface ConversationTimelineProps {
+export interface ConversationTimelineProps {
   readonly transcript: readonly TranscriptMessage[];
   readonly isTranscriptLoading: boolean;
   readonly timelinePaneRef: MutableRefObject<HTMLDivElement | null>;

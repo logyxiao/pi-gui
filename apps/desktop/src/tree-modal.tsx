@@ -7,7 +7,7 @@ import type {
 } from "@pi-gui/session-driver/types";
 import { ChevronDownIcon, ChevronRightIcon } from "./icons";
 
-interface TreeModalProps {
+export interface TreeModalProps {
   readonly tree?: SessionTreeSnapshot;
   readonly loading: boolean;
   readonly submitting: boolean;
