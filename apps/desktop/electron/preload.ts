@@ -65,53 +65,18 @@ contextBridge.exposeInMainWorld("piApp", {
   versions: process.versions,
   ping: () => ipcRenderer.invoke(desktopIpc.ping) as Promise<string>,
   getState: () => ipcRenderer.invoke(desktopIpc.stateRequest) as Promise<DesktopAppState>,
-  onStateChanged: (listener: (state: DesktopAppState) => void) => {
-    const handle = (_event: Electron.IpcRendererEvent, state: DesktopAppState) => {
-      listener(state);
-    };
-    ipcRenderer.on(desktopIpc.stateChanged, handle);
-    return () => {
-      ipcRenderer.removeListener(desktopIpc.stateChanged, handle);
-    };
-  },
+  onStateChanged: (listener: (state: DesktopAppState) => void) =>
+    subscribeIpc(desktopIpc.stateChanged, listener),
   getSelectedTranscript: () =>
     ipcRenderer.invoke(desktopIpc.selectedTranscriptRequest) as Promise<SelectedTranscriptRecord | null>,
-  onSelectedTranscriptChanged: (listener: (payload: SelectedTranscriptRecord | null) => void) => {
-    const handle = (_event: Electron.IpcRendererEvent, payload: SelectedTranscriptRecord | null) => {
-      listener(payload);
-    };
-    ipcRenderer.on(desktopIpc.selectedTranscriptChanged, handle);
-    return () => {
-      ipcRenderer.removeListener(desktopIpc.selectedTranscriptChanged, handle);
-    };
-  },
-  onCommand: (listener: (command: PiDesktopCommand) => void) => {
-    const handle = (_event: Electron.IpcRendererEvent, command: PiDesktopCommand) => {
-      listener(command);
-    };
-    ipcRenderer.on(desktopIpc.appCommand, handle);
-    return () => {
-      ipcRenderer.removeListener(desktopIpc.appCommand, handle);
-    };
-  },
-  onWorkspacePicked: (listener: (workspaceId: string) => void) => {
-    const handle = (_event: Electron.IpcRendererEvent, workspaceId: string) => {
-      listener(workspaceId);
-    };
-    ipcRenderer.on(desktopIpc.workspacePicked, handle);
-    return () => {
-      ipcRenderer.removeListener(desktopIpc.workspacePicked, handle);
-    };
-  },
-  onClipboardImagePasted: (listener: (attachment: ComposerImageAttachment) => void) => {
-    const handle = (_event: Electron.IpcRendererEvent, attachment: ComposerImageAttachment) => {
-      listener(attachment);
-    };
-    ipcRenderer.on(desktopIpc.clipboardImagePasted, handle);
-    return () => {
-      ipcRenderer.removeListener(desktopIpc.clipboardImagePasted, handle);
-    };
-  },
+  onSelectedTranscriptChanged: (listener: (payload: SelectedTranscriptRecord | null) => void) =>
+    subscribeIpc(desktopIpc.selectedTranscriptChanged, listener),
+  onCommand: (listener: (command: PiDesktopCommand) => void) =>
+    subscribeIpc(desktopIpc.appCommand, listener),
+  onWorkspacePicked: (listener: (workspaceId: string) => void) =>
+    subscribeIpc(desktopIpc.workspacePicked, listener),
+  onClipboardImagePasted: (listener: (attachment: ComposerImageAttachment) => void) =>
+    subscribeIpc(desktopIpc.clipboardImagePasted, listener),
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
   addWorkspacePath: (workspacePath: string) =>
     ipcRenderer.invoke(desktopIpc.addWorkspacePath, workspacePath) as Promise<DesktopAppState>,
@@ -228,13 +193,8 @@ contextBridge.exposeInMainWorld("piApp", {
     ipcRenderer.invoke(desktopIpc.requestNotificationPermission) as Promise<DesktopNotificationPermissionStatus>,
   openSystemNotificationSettings: () =>
     ipcRenderer.invoke(desktopIpc.openSystemNotificationSettings) as Promise<void>,
-  onNotificationPermissionStatusChanged: (callback: (status: DesktopNotificationPermissionStatus) => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, status: DesktopNotificationPermissionStatus) => callback(status);
-    ipcRenderer.on(desktopIpc.notificationPermissionStatusChanged, handler);
-    return () => {
-      ipcRenderer.removeListener(desktopIpc.notificationPermissionStatusChanged, handler);
-    };
-  },
+  onNotificationPermissionStatusChanged: (callback: (status: DesktopNotificationPermissionStatus) => void) =>
+    subscribeIpc(desktopIpc.notificationPermissionStatusChanged, callback),
   pickComposerAttachments: () => ipcRenderer.invoke(desktopIpc.pickComposerAttachments) as Promise<DesktopAppState>,
   readClipboardImage: () => ipcRenderer.invoke(desktopIpc.readClipboardImage) as Promise<ComposerImageAttachment | null>,
   addComposerAttachments: (attachments: readonly ComposerAttachment[]) =>
@@ -290,13 +250,8 @@ contextBridge.exposeInMainWorld("piApp", {
   getResolvedTheme: () => ipcRenderer.invoke(desktopIpc.getResolvedTheme) as Promise<"light" | "dark">,
   setThemeMode: (mode: "system" | "light" | "dark") =>
     ipcRenderer.invoke(desktopIpc.setThemeMode, mode) as Promise<string>,
-  onThemeChanged: (callback: (theme: "light" | "dark") => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, theme: "light" | "dark") => callback(theme);
-    ipcRenderer.on(desktopIpc.themeChanged, handler);
-    return () => {
-      ipcRenderer.removeListener(desktopIpc.themeChanged, handler);
-    };
-  },
+  onThemeChanged: (callback: (theme: "light" | "dark") => void) =>
+    subscribeIpc(desktopIpc.themeChanged, callback),
   getLanguage: () => ipcRenderer.invoke(desktopIpc.getLanguage) as Promise<"en" | "zh-CN">,
   setLanguage: (language: "en" | "zh-CN") =>
     ipcRenderer.invoke(desktopIpc.setLanguage, language) as Promise<"en" | "zh-CN">,

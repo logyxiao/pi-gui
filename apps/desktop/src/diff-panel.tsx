@@ -3,7 +3,6 @@ import type { PiDesktopApi } from "./ipc";
 import { InlineDiff } from "./diff-inline";
 import { ChevronDownIcon, ChevronRightIcon, MinusIcon, PlusIcon, RefreshIcon, SparkIcon } from "./icons";
 import { extensionToLanguage } from "./syntax-highlight";
-import { loadReviewed, pruneReviewed, saveReviewed } from "./reviewed-files-store";
 import { useI18n } from "./i18n";
 
 interface ChangedFile {
@@ -44,6 +43,7 @@ interface DiffPanelProps {
   readonly api: PiDesktopApi;
   readonly sessionStatus: string | undefined;
   readonly fileRequest?: DiffPanelFileRequest | null;
+  readonly onResizePointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
 }
 
 export function DiffPanel({
@@ -52,6 +52,7 @@ export function DiffPanel({
   api,
   sessionStatus,
   fileRequest,
+  onResizePointerDown,
 }: DiffPanelProps) {
   const { t } = useI18n();
   const [files, setFiles] = useState<readonly ChangedFile[]>([]);
@@ -72,14 +73,6 @@ export function DiffPanel({
   const [expandedGroups, setExpandedGroups] = useState<ReadonlySet<ChangeGroup>>(
     () => new Set(["staged", "unstaged"]),
   );
-  const [reviewed, setReviewed] = useState<ReadonlySet<string>>(() =>
-    loadReviewed(workspaceId, sessionId),
-  );
-
-  useEffect(() => {
-    setReviewed(loadReviewed(workspaceId, sessionId));
-  }, [workspaceId, sessionId]);
-
   const refresh = useCallback(async () => {
     setLoading(true);
     setErrorMessage("");
@@ -96,13 +89,6 @@ export function DiffPanel({
       setSelectedFile((current) =>
         current && !result.some((f) => f.path === current.path && (current.group === "staged" ? f.staged : f.unstaged)) ? null : current,
       );
-      setReviewed((current) => {
-        const pruned = pruneReviewed(current, result.map((f) => f.path));
-        if (pruned !== current) {
-          saveReviewed(workspaceId, sessionId, pruned);
-        }
-        return pruned;
-      });
       setLoading(false);
       return result;
     } catch (error: unknown) {
@@ -285,26 +271,6 @@ export function DiffPanel({
     });
   };
 
-  const toggleReviewed = useCallback(
-    (filePath: string) => {
-      setReviewed((current) => {
-        const next = new Set(current);
-        if (next.has(filePath)) {
-          next.delete(filePath);
-        } else {
-          next.add(filePath);
-        }
-        saveReviewed(workspaceId, sessionId, next);
-        return next;
-      });
-    },
-    [workspaceId, sessionId],
-  );
-
-  const reviewedCount = useMemo(
-    () => files.reduce((acc, f) => acc + (reviewed.has(f.path) ? 1 : 0), 0),
-    [files, reviewed],
-  );
   const stagedFiles = useMemo(() => files.filter((file) => file.staged), [files]);
   const unstagedFiles = useMemo(() => files.filter((file) => file.unstaged), [files]);
   const hasStagedFiles = stagedFiles.length > 0;
@@ -317,11 +283,17 @@ export function DiffPanel({
 
   return (
     <aside className="diff-panel" onMouseEnter={refreshIfStale}>
+      <button
+        aria-label={t("changes.resizePanel")}
+        className="diff-panel__resize-handle"
+        type="button"
+        onPointerDown={onResizePointerDown}
+      />
       <div className="diff-panel__header">
         <h2 className="diff-panel__title">{t("changes.title")}</h2>
         {files.length > 0 ? (
           <span className="diff-panel__counter" data-testid="diff-panel-counter">
-            {t("changes.reviewedCount", { reviewed: reviewedCount, total: files.length })}
+            {files.length}
           </span>
         ) : null}
         <button
@@ -398,10 +370,8 @@ export function DiffPanel({
                   onFileAction={handleUnstage}
                   onSelectFile={setSelectedFile}
                   onToggle={() => toggleGroup("staged")}
-                  reviewed={reviewed}
                   selectedFile={selectedFile}
                   title={t("changes.stagedChanges")}
-                  toggleReviewed={toggleReviewed}
                 />
                 <ChangeSection
                   actionLabel={t("changes.stageAll")}
@@ -412,10 +382,8 @@ export function DiffPanel({
                   onFileAction={handleStage}
                   onSelectFile={setSelectedFile}
                   onToggle={() => toggleGroup("unstaged")}
-                  reviewed={reviewed}
                   selectedFile={selectedFile}
                   title={t("changes.unstagedChanges")}
-                  toggleReviewed={toggleReviewed}
                 />
               </div>
 
@@ -450,10 +418,8 @@ interface ChangeSectionProps {
   readonly onFileAction: (filePath: string) => void;
   readonly onSelectFile: (file: { readonly path: string; readonly group: ChangeGroup } | null) => void;
   readonly onToggle: () => void;
-  readonly reviewed: ReadonlySet<string>;
   readonly selectedFile: { readonly path: string; readonly group: ChangeGroup } | null;
   readonly title: string;
-  readonly toggleReviewed: (filePath: string) => void;
 }
 
 function ChangeSection({
@@ -465,10 +431,8 @@ function ChangeSection({
   onFileAction,
   onSelectFile,
   onToggle,
-  reviewed,
   selectedFile,
   title,
-  toggleReviewed,
 }: ChangeSectionProps) {
   const { t } = useI18n();
   return (
@@ -501,25 +465,15 @@ function ChangeSection({
             <div className="diff-panel__section-empty">{t("changes.noFiles")}</div>
           ) : (
             files.map((file) => {
-              const isReviewed = reviewed.has(file.path);
               const isSelected = selectedFile?.path === file.path && selectedFile.group === group;
               const className = [
                 "diff-panel__file",
                 isSelected ? "diff-panel__file--selected" : "",
-                isReviewed ? "diff-panel__file--reviewed" : "",
               ]
                 .filter(Boolean)
                 .join(" ");
               return (
                 <div className={className} key={`${group}:${file.path}`} data-file-path={file.path} data-change-group={group}>
-                  <input
-                    aria-label={t("changes.markReviewed", { path: file.path })}
-                    className="diff-panel__reviewed-checkbox"
-                    data-testid={`diff-panel-reviewed-${file.path}`}
-                    type="checkbox"
-                    checked={isReviewed}
-                    onChange={() => toggleReviewed(file.path)}
-                  />
                   <button
                     className="diff-panel__file-name"
                     type="button"

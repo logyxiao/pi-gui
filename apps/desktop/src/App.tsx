@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type CSSProperties, type DragEvent, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type SetStateAction } from "react";
 import type { SessionTreeSnapshot } from "@pi-gui/session-driver/types";
 import type { RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
 import {
@@ -60,6 +60,33 @@ function canTogglePrimarySidebar(view: AppView | undefined): boolean {
   return view === "threads" || view === "new-thread";
 }
 
+const DIFF_PANEL_WIDTH_STORAGE_KEY = "pi-gui:diff-panel-width:v1";
+const DIFF_PANEL_WIDTH_DEFAULT = 400;
+const DIFF_PANEL_WIDTH_MIN = 320;
+const DIFF_PANEL_WIDTH_MAX = 720;
+
+function clampDiffPanelWidth(width: number): number {
+  return Math.min(DIFF_PANEL_WIDTH_MAX, Math.max(DIFF_PANEL_WIDTH_MIN, Math.round(width)));
+}
+
+function loadDiffPanelWidth(): number {
+  try {
+    const raw = globalThis.localStorage?.getItem(DIFF_PANEL_WIDTH_STORAGE_KEY);
+    const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
+    return Number.isFinite(parsed) ? clampDiffPanelWidth(parsed) : DIFF_PANEL_WIDTH_DEFAULT;
+  } catch {
+    return DIFF_PANEL_WIDTH_DEFAULT;
+  }
+}
+
+function saveDiffPanelWidth(width: number): void {
+  try {
+    globalThis.localStorage?.setItem(DIFF_PANEL_WIDTH_STORAGE_KEY, String(clampDiffPanelWidth(width)));
+  } catch {
+    // localStorage unavailable; keep the in-memory width only.
+  }
+}
+
 export default function App({
   language,
   onSetLanguage,
@@ -97,6 +124,7 @@ export default function App({
   const newThreadComposerRef = useRef<HTMLTextAreaElement | null>(null);
   const previousActiveViewRef = useRef<AppView | null>(null);
   const [showDiffPanel, setShowDiffPanel] = useState(false);
+  const [diffPanelWidth, setDiffPanelWidth] = useState(loadDiffPanelWidth);
   const [diffFileRequest, setDiffFileRequest] = useState<DiffPanelFileRequest | null>(null);
   const api = window.piApp;
   const { pending: confirmDialog, request: requestConfirm, close: closeConfirmDialog } = useConfirmDialog();
@@ -700,6 +728,24 @@ export default function App({
     previousActiveViewRef.current = snapshot.activeView;
   }, [preserveBottomForLayoutChange, resetForNonThreadView, selectedSession, selectedWorkspace?.id, snapshot]);
 
+  const handleDiffPanelResizePointerDown = useCallback((event: ReactPointerEvent<HTMLElement>) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = diffPanelWidth;
+    let nextWidth = startWidth;
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      nextWidth = clampDiffPanelWidth(startWidth + startX - moveEvent.clientX);
+      setDiffPanelWidth(nextWidth);
+    };
+    const handlePointerUp = () => {
+      saveDiffPanelWidth(nextWidth);
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp, { once: true });
+  }, [diffPanelWidth]);
+
   if (!api || !snapshot) {
     return (
       <div className="shell shell--loading">
@@ -719,6 +765,9 @@ export default function App({
     isTerminalVisibleForSelectedThread ? "main--with-terminal" : "",
     showTerminalTakeover ? "main--terminal-takeover" : "",
   ].filter(Boolean).join(" ");
+  const mainStyle = showDiffPanel
+    ? ({ "--diff-panel-width": `${diffPanelWidth}px` } as CSSProperties)
+    : undefined;
   const terminalPanel = isTerminalVisibleForSelectedThread && selectedWorkspace ? (
     <TerminalPanel
       workspace={selectedWorkspace}
@@ -1297,7 +1346,7 @@ export default function App({
         />
       ) : null}
 
-      <main className={mainClassName}>
+      <main className={mainClassName} style={mainStyle}>
         <Topbar
           activeView={snapshot.activeView}
           rootWorkspace={rootWorkspace}
@@ -1502,6 +1551,7 @@ export default function App({
             api={api}
             sessionStatus={selectedSession.status}
             fileRequest={diffFileRequest}
+            onResizePointerDown={handleDiffPanelResizePointerDown}
           />
         ) : null}
       </main>

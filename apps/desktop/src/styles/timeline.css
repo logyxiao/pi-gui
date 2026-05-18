@@ -149,7 +149,7 @@
 .conversation-nav {
   position: absolute;
   top: 0;
-  right: -32px;
+  right: -12px;
   bottom: 0;
   width: 15px;
   overflow: visible;
@@ -652,7 +652,7 @@
 /* Diff review panel */
 
 .diff-panel {
-  width: 400px;
+  width: 100%;
   min-width: 320px;
   border-left: 1px solid var(--border);
   display: flex;
@@ -661,10 +661,40 @@
   overflow: hidden;
   grid-column: 2;
   grid-row: 2 / -1;
+  position: relative;
 }
 
 .main--with-diff.main--with-terminal > .diff-panel {
   grid-row: 2 / span 3;
+}
+
+.diff-panel__resize-handle {
+  position: absolute;
+  top: 0;
+  left: -5px;
+  bottom: 0;
+  width: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: ew-resize;
+  z-index: 4;
+}
+
+.diff-panel__resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 1px;
+  background: transparent;
+  transition: background 140ms ease;
+}
+
+.diff-panel__resize-handle:hover::after,
+.diff-panel__resize-handle:focus-visible::after {
+  background: var(--accent);
 }
 
 .diff-panel__header {
@@ -790,17 +820,6 @@
   line-height: 1.35;
 }
 
-.diff-panel__reviewed-checkbox {
-  margin: 0 0 0 12px;
-  flex-shrink: 0;
-  cursor: pointer;
-}
-
-.diff-panel__file--reviewed .diff-panel__file-name {
-  color: var(--muted-soft);
-  text-decoration: line-through;
-}
-
 .diff-panel__empty {
   min-height: 0;
   flex: 1 1 auto;
@@ -912,7 +931,7 @@
   display: inline-grid;
   place-items: center;
   padding: 0;
-  border: 1px solid transparent;
+  border: 0;
   border-radius: 5px;
   background: transparent;
   color: var(--icon);
@@ -928,7 +947,6 @@
 
 .diff-panel__section-action:hover:not(:disabled),
 .diff-panel__section-action:focus-visible {
-  border-color: var(--border);
   background: var(--surface);
   color: var(--icon-strong);
   outline: none;
@@ -1177,7 +1195,7 @@
   place-items: center;
   padding: 0;
   margin-right: 8px;
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: 6px;
   background: none;
   cursor: pointer;

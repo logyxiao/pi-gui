@@ -22,7 +22,7 @@
 }
 
 .main--with-diff {
-  grid-template-columns: 1fr 400px;
+  grid-template-columns: minmax(0, 1fr) var(--diff-panel-width, 400px);
 }
 
 .main--with-diff > .topbar {
