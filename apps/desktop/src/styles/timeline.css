@@ -760,6 +760,23 @@
   flex: 0 0 auto;
 }
 
+.diff-panel__generate-btn--loading {
+  color: var(--icon-active);
+  opacity: 1;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.diff-panel__generate-btn--loading svg {
+  animation: diff-generate-spin 900ms linear infinite;
+  transform-origin: 50% 50%;
+}
+
+@keyframes diff-generate-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .diff-panel__commit-action-row {
   display: grid;
   grid-template-columns: minmax(96px, 1fr) minmax(0, auto);

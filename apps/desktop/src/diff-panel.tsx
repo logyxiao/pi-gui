@@ -324,7 +324,8 @@ export function DiffPanel({
           />
           <button
             aria-label={t("changes.generateCommitMessage")}
-            className="icon-button diff-panel__generate-btn"
+            aria-busy={generatingMessage}
+            className={`icon-button diff-panel__generate-btn${generatingMessage ? " diff-panel__generate-btn--loading" : ""}`}
             type="button"
             onClick={handleGenerateMessage}
             disabled={!hasStagedFiles || generatingMessage}
