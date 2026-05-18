@@ -172,6 +172,27 @@ export function RestoreIcon() {
   );
 }
 
+export function UndoIcon() {
+  return (
+    <Icon>
+      <path
+        d="M7.3 5.5 4.2 8.6l3.1 3.1"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.55"
+      />
+      <path
+        d="M4.5 8.6h6.9a4.1 4.1 0 1 1 0 8.2H8.2"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.55"
+      />
+    </Icon>
+  );
+}
+
 export function ChevronDownIcon() {
   return (
     <Icon>

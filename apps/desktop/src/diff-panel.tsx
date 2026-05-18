@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { PiDesktopApi } from "./ipc";
 import { InlineDiff } from "./diff-inline";
-import { ChevronDownIcon, ChevronRightIcon, MinusIcon, PlusIcon, RefreshIcon, SparkIcon } from "./icons";
+import { ChevronDownIcon, ChevronRightIcon, MinusIcon, PlusIcon, RefreshIcon, SparkIcon, UndoIcon } from "./icons";
 import { extensionToLanguage } from "./syntax-highlight";
 import { useI18n } from "./i18n";
 
@@ -154,6 +154,13 @@ export function DiffPanel({
     setErrorMessage("");
     void api.unstageFile(workspaceId, filePath).then(() => void refresh()).catch((error: unknown) => {
       setErrorMessage(error instanceof Error ? error.message : t("changes.errorUnstageFile"));
+    });
+  };
+
+  const handleDiscard = (filePath: string) => {
+    setErrorMessage("");
+    void api.discardFileChanges(workspaceId, filePath).then(() => void refresh()).catch((error: unknown) => {
+      setErrorMessage(error instanceof Error ? error.message : t("changes.errorDiscardFile"));
     });
   };
 
@@ -380,6 +387,7 @@ export function DiffPanel({
                   group="unstaged"
                   isExpanded={expandedGroups.has("unstaged")}
                   onActionAll={handleStageAll}
+                  onDiscardFile={handleDiscard}
                   onFileAction={handleStage}
                   onSelectFile={setSelectedFile}
                   onToggle={() => toggleGroup("unstaged")}
@@ -416,6 +424,7 @@ interface ChangeSectionProps {
   readonly group: ChangeGroup;
   readonly isExpanded: boolean;
   readonly onActionAll: () => void;
+  readonly onDiscardFile?: (filePath: string) => void;
   readonly onFileAction: (filePath: string) => void;
   readonly onSelectFile: (file: { readonly path: string; readonly group: ChangeGroup } | null) => void;
   readonly onToggle: () => void;
@@ -429,6 +438,7 @@ function ChangeSection({
   group,
   isExpanded,
   onActionAll,
+  onDiscardFile,
   onFileAction,
   onSelectFile,
   onToggle,
@@ -483,6 +493,21 @@ function ChangeSection({
                     <span className={`diff-panel__status-dot diff-panel__status-dot--${file.status}`} />
                     <span>{file.path}</span>
                   </button>
+                  {onDiscardFile ? (
+                    <span className="diff-panel__file-action-wrap">
+                      <button
+                        aria-label={`${t("changes.discard")} ${file.path}`}
+                        className="diff-panel__discard-btn"
+                        type="button"
+                        onClick={() => onDiscardFile(file.path)}
+                      >
+                        <UndoIcon />
+                      </button>
+                      <span className="diff-panel__file-action-tooltip" role="tooltip">
+                        {t("changes.discard")}
+                      </span>
+                    </span>
+                  ) : null}
                   <button
                     aria-label={`${group === "staged" ? t("changes.unstage") : t("changes.stage")} ${file.path}`}
                     className="diff-panel__stage-btn"

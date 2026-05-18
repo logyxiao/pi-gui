@@ -1,3 +1,15 @@
+export interface ModelsJsonOpenAiProviderToolsCompat {
+  readonly enabled?: boolean;
+  readonly imageGeneration?: boolean;
+  readonly outputDirectory?: string;
+}
+
+export interface ModelsJsonCompat {
+  readonly supportsDeveloperRole?: boolean;
+  readonly supportsReasoningEffort?: boolean;
+  readonly openaiProviderTools?: ModelsJsonOpenAiProviderToolsCompat;
+}
+
 export interface ModelsJsonModelConfig {
   readonly id: string;
   readonly name?: string;
@@ -7,6 +19,7 @@ export interface ModelsJsonModelConfig {
   readonly input?: readonly string[];
   readonly contextWindow?: number;
   readonly maxTokens?: number;
+  readonly compat?: ModelsJsonCompat;
 }
 
 export interface ModelsJsonProviderConfig {
@@ -21,6 +34,7 @@ export interface ModelsJsonProviderConfig {
   readonly usageLastValue?: string;
   readonly usageLastCheckedAt?: string;
   readonly enabled?: boolean;
+  readonly compat?: ModelsJsonCompat;
   readonly models?: readonly ModelsJsonModelConfig[];
 }
 

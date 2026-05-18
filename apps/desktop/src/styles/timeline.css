@@ -1205,13 +1205,47 @@
   background: #8b949e;
 }
 
+.diff-panel__file-action-wrap {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.diff-panel__file-action-tooltip {
+  position: absolute;
+  right: 50%;
+  bottom: calc(100% + 6px);
+  z-index: 10;
+  max-width: 180px;
+  padding: 4px 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.25;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(50%, 4px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.diff-panel__file-action-wrap:hover .diff-panel__file-action-tooltip,
+.diff-panel__file-action-wrap:focus-within .diff-panel__file-action-tooltip {
+  opacity: 1;
+  transform: translate(50%, 0);
+}
+
+.diff-panel__discard-btn,
 .diff-panel__stage-btn {
   width: 26px;
   height: 26px;
   display: inline-grid;
   place-items: center;
   padding: 0;
-  margin-right: 8px;
   border: 0;
   border-radius: 6px;
   background: none;
@@ -1219,15 +1253,22 @@
   color: var(--icon);
 }
 
+.diff-panel__stage-btn {
+  margin-right: 8px;
+}
+
+.diff-panel__discard-btn svg,
 .diff-panel__stage-btn svg {
   width: 15px;
   height: 15px;
 }
 
+.diff-panel__discard-btn:hover:not(:disabled),
 .diff-panel__stage-btn:hover:not(:disabled) {
   background: var(--surface-muted);
 }
 
+.diff-panel__discard-btn:disabled,
 .diff-panel__stage-btn:disabled {
   opacity: 0.55;
   cursor: default;

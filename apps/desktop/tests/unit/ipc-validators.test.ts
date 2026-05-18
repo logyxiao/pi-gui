@@ -104,11 +104,25 @@ describe("assertModelsJson", () => {
           api: "anthropic-messages",
           apiKey: "sk-1",
           headers: { "x-test": "1" },
-          models: [{ id: "m1", enabled: true }],
+          compat: { openaiProviderTools: { enabled: true, outputDirectory: "images" } },
+          models: [{ id: "m1", enabled: true, compat: { openaiProviderTools: { imageGeneration: true } } }],
         },
       },
     };
     expect(assertModelsJson(value)).toEqual(value);
+  });
+
+  it("rejects invalid OpenAI provider tools compatibility", () => {
+    expect(() =>
+      assertModelsJson({
+        providers: {
+          p1: {
+            baseUrl: "x",
+            compat: { openaiProviderTools: { imageGeneration: "yes" } },
+          },
+        },
+      }),
+    ).toThrow(/imageGeneration/);
   });
 
   it("rejects provider id length 0", () => {

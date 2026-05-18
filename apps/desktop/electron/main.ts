@@ -30,6 +30,7 @@ import { pathToFileURL } from "node:url";
 import { DesktopAppStore } from "./app-store";
 import {
   commitStagedChanges,
+  discardFileChanges,
   generateCommitMessage,
   getCommitHistory,
   getChangedFiles,
@@ -819,6 +820,13 @@ app.whenReady().then(async () => {
       throw new Error(`Unknown workspace: ${workspaceId}`);
     }
     await unstageFile(workspacePath, filePath);
+  });
+  registerRendererIpc(desktopIpc.discardFileChanges, async (_event, workspaceId: string, filePath: string) => {
+    const workspacePath = store.getWorkspacePath(workspaceId);
+    if (!workspacePath) {
+      throw new Error(`Unknown workspace: ${workspaceId}`);
+    }
+    await discardFileChanges(workspacePath, filePath);
   });
   registerRendererIpc(desktopIpc.stageAllFiles, async (_event, workspaceId: string) => {
     const workspacePath = store.getWorkspacePath(workspaceId);

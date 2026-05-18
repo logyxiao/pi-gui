@@ -230,6 +230,8 @@ contextBridge.exposeInMainWorld("piApp", {
     ipcRenderer.invoke(desktopIpc.stageFile, workspaceId, filePath) as Promise<void>,
   unstageFile: (workspaceId: string, filePath: string) =>
     ipcRenderer.invoke(desktopIpc.unstageFile, workspaceId, filePath) as Promise<void>,
+  discardFileChanges: (workspaceId: string, filePath: string) =>
+    ipcRenderer.invoke(desktopIpc.discardFileChanges, workspaceId, filePath) as Promise<void>,
   stageAllFiles: (workspaceId: string) =>
     ipcRenderer.invoke(desktopIpc.stageAllFiles, workspaceId) as Promise<void>,
   unstageAllFiles: (workspaceId: string) =>

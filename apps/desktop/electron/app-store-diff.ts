@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { rm } from "node:fs/promises";
 import { realpathSync } from "node:fs";
 import path from "node:path";
 import type { PiSdkDriver } from "@pi-gui/pi-sdk-driver";
@@ -142,6 +143,17 @@ export function stageFile(workspacePath: string, filePath: string): Promise<void
 export function unstageFile(workspacePath: string, filePath: string): Promise<void> {
   validateFilePath(workspacePath, filePath);
   return runGit(workspacePath, ["restore", "--staged", "--", filePath]);
+}
+
+export async function discardFileChanges(workspacePath: string, filePath: string): Promise<void> {
+  validateFilePath(workspacePath, filePath);
+  const status = await getChangedFiles(workspacePath);
+  const entry = status.find((file) => file.path === filePath);
+  if (entry?.status === "untracked") {
+    await rm(path.resolve(workspacePath, filePath), { force: true, recursive: true });
+    return;
+  }
+  await runGit(workspacePath, ["restore", "--worktree", "--", filePath]);
 }
 
 export function stageAllFiles(workspacePath: string): Promise<void> {

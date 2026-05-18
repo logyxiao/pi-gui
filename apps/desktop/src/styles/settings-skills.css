@@ -472,6 +472,63 @@
   background: #fbfcfe;
 }
 
+.model-manager__capability-panel {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto minmax(220px, 0.9fr);
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+  margin-top: 10px;
+  border: 1px solid #e3e9f3;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.model-manager__capability-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.model-manager__capability-copy strong {
+  color: var(--text-strong);
+  font-size: 13px;
+  font-weight: 670;
+}
+
+.model-manager__capability-copy span:last-child {
+  color: var(--muted-soft);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.model-manager__capability-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: end;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid #d7deea;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 620;
+  white-space: nowrap;
+}
+
+.model-manager__capability-path {
+  min-width: 0;
+}
+
+.model-manager__capability-path .settings-text-input {
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 9px;
+  border-radius: 9px;
+  font-size: 12px;
+}
+
 .model-manager__dirty-badge {
   display: inline-flex;
   align-items: center;
@@ -618,13 +675,31 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
-  padding: 9px 10px;
+  padding: 4px;
   border: 1px solid #edf0f6;
   border-radius: 10px;
   background: #fff;
   color: var(--muted-strong);
   font: inherit;
   text-align: left;
+}
+
+.model-manager__provider-select {
+  min-width: 0;
+  padding: 5px 6px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.model-manager__provider-select:hover,
+.model-manager__provider-select:focus-visible {
+  background: rgba(15, 23, 42, 0.04);
+  outline: none;
 }
 
 .model-manager__provider-copy {
@@ -936,6 +1011,15 @@
   .model-manager__model {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .model-manager__capability-panel {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .model-manager__capability-toggle {
+    justify-self: start;
   }
 }
 

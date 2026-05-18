@@ -7,6 +7,18 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
+export interface ModelsJsonOpenAiProviderToolsCompat {
+  readonly enabled?: boolean;
+  readonly imageGeneration?: boolean;
+  readonly outputDirectory?: string;
+}
+
+export interface ModelsJsonCompat {
+  readonly supportsDeveloperRole?: boolean;
+  readonly supportsReasoningEffort?: boolean;
+  readonly openaiProviderTools?: ModelsJsonOpenAiProviderToolsCompat;
+}
+
 export interface ModelsJsonModelConfig {
   readonly id: string;
   readonly name?: string;
@@ -16,6 +28,7 @@ export interface ModelsJsonModelConfig {
   readonly input?: readonly string[];
   readonly contextWindow?: number;
   readonly maxTokens?: number;
+  readonly compat?: ModelsJsonCompat;
 }
 
 export interface ModelsJsonProviderConfig {
@@ -30,6 +43,7 @@ export interface ModelsJsonProviderConfig {
   readonly usageLastValue?: string;
   readonly usageLastCheckedAt?: string;
   readonly enabled?: boolean;
+  readonly compat?: ModelsJsonCompat;
   readonly models?: readonly ModelsJsonModelConfig[];
 }
 
@@ -113,6 +127,7 @@ export function normalizeModelsJson(input: unknown): ModelsJsonFile {
   for (const [providerId, providerValue] of Object.entries(providers)) {
     if (!providerValue || typeof providerValue !== "object") continue;
     const provider = providerValue as Record<string, unknown>;
+    const providerCompat = normalizeCompat(provider.compat);
     const models = Array.isArray(provider.models)
       ? provider.models.flatMap((modelValue) => normalizeModelConfig(modelValue)).filter(Boolean)
       : undefined;
@@ -128,6 +143,7 @@ export function normalizeModelsJson(input: unknown): ModelsJsonFile {
       ...(typeof provider.usageLastValue === "string" ? { usageLastValue: provider.usageLastValue } : {}),
       ...(typeof provider.usageLastCheckedAt === "string" ? { usageLastCheckedAt: provider.usageLastCheckedAt } : {}),
       ...(typeof provider.enabled === "boolean" ? { enabled: provider.enabled } : {}),
+      ...(providerCompat ? { compat: providerCompat } : {}),
       ...(models && models.length > 0 ? { models } : {}),
     };
   }
@@ -692,6 +708,7 @@ function normalizeModelConfig(value: unknown): ModelsJsonModelConfig[] {
   const model = value as Record<string, unknown>;
   const id = typeof model.id === "string" ? model.id.trim() : "";
   if (!id) return [];
+  const compat = normalizeCompat(model.compat);
   return [{
     id,
     ...(typeof model.name === "string" ? { name: model.name } : {}),
@@ -701,7 +718,31 @@ function normalizeModelConfig(value: unknown): ModelsJsonModelConfig[] {
     ...(Array.isArray(model.input) ? { input: model.input.filter((entry): entry is string => typeof entry === "string") } : {}),
     ...(typeof model.contextWindow === "number" ? { contextWindow: model.contextWindow } : {}),
     ...(typeof model.maxTokens === "number" ? { maxTokens: model.maxTokens } : {}),
+    ...(compat ? { compat } : {}),
   }];
+}
+
+function normalizeCompat(value: unknown): ModelsJsonCompat | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const compat = value as Record<string, unknown>;
+  const openaiProviderTools = normalizeOpenAiProviderToolsCompat(compat.openaiProviderTools);
+  const normalized: ModelsJsonCompat = {
+    ...(typeof compat.supportsDeveloperRole === "boolean" ? { supportsDeveloperRole: compat.supportsDeveloperRole } : {}),
+    ...(typeof compat.supportsReasoningEffort === "boolean" ? { supportsReasoningEffort: compat.supportsReasoningEffort } : {}),
+    ...(openaiProviderTools ? { openaiProviderTools } : {}),
+  };
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
+}
+
+function normalizeOpenAiProviderToolsCompat(value: unknown): ModelsJsonOpenAiProviderToolsCompat | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const compat = value as Record<string, unknown>;
+  const normalized: ModelsJsonOpenAiProviderToolsCompat = {
+    ...(typeof compat.enabled === "boolean" ? { enabled: compat.enabled } : {}),
+    ...(typeof compat.imageGeneration === "boolean" ? { imageGeneration: compat.imageGeneration } : {}),
+    ...(typeof compat.outputDirectory === "string" ? { outputDirectory: compat.outputDirectory } : {}),
+  };
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
 }
 
 function normalizeStringRecord(value: unknown): Record<string, string> {

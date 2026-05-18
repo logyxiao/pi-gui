@@ -303,6 +303,36 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
     }));
   };
 
+  const updateProviderOpenAiTools = (updates: Partial<NonNullable<ModelsJsonProviderConfig["compat"]>["openaiProviderTools"]>) => {
+    if (!selectedProviderId) return;
+    setProvider(selectedProviderId, (provider) => ({
+      ...provider,
+      compat: {
+        ...(provider.compat ?? {}),
+        openaiProviderTools: {
+          ...(provider.compat?.openaiProviderTools ?? {}),
+          ...updates,
+        },
+      },
+    }));
+  };
+
+  const updateModelOpenAiTools = (
+    modelIndex: number,
+    updates: Partial<NonNullable<ModelsJsonModelConfig["compat"]>["openaiProviderTools"]>,
+  ) => {
+    updateModel(modelIndex, (model) => ({
+      ...model,
+      compat: {
+        ...(model.compat ?? {}),
+        openaiProviderTools: {
+          ...(model.compat?.openaiProviderTools ?? {}),
+          ...updates,
+        },
+      },
+    }));
+  };
+
   const save = async () => {
     if (!window.piApp) return;
     setSaving(true);
@@ -447,18 +477,26 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
           {filteredProviderIds.map((providerId) => {
             const provider = modelsJson.providers[providerId] ?? { models: [] };
             const enabled = provider.enabled !== false;
+            const isSelected = providerId === selectedProviderId;
             return (
-              <button className={`model-manager__provider${providerId === selectedProviderId ? " model-manager__provider--active" : ""}`} key={providerId} type="button" onClick={() => setSelectedProviderId(providerId)}>
-                <span className="model-manager__provider-copy">
-                  <span className="model-manager__provider-name">{providerId}</span>
-                  <span className="model-manager__provider-meta">{provider.models?.length ?? 0}</span>
-                </span>
+              <div className={`model-manager__provider${isSelected ? " model-manager__provider--active" : ""}`} key={providerId}>
+                <button
+                  className="model-manager__provider-select"
+                  type="button"
+                  aria-pressed={isSelected}
+                  onClick={() => setSelectedProviderId(providerId)}
+                >
+                  <span className="model-manager__provider-copy">
+                    <span className="model-manager__provider-name">{providerId}</span>
+                    <span className="model-manager__provider-meta">{provider.models?.length ?? 0}</span>
+                  </span>
+                </button>
                 <ToggleSwitch
                   checked={enabled}
                   label={t("settings.models.providerEnabled")}
                   onChange={(checked) => setProvider(providerId, (provider) => ({ ...provider, enabled: checked }))}
                 />
-              </button>
+              </div>
             );
           })}
           {providerIds.length > 0 && filteredProviderIds.length === 0 ? <div className="settings-hint">{t("settings.models.noProviders")}</div> : null}
@@ -520,6 +558,30 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
                   <span>{t("settings.models.queryUsage")}</span>
                 </button>
               </div>
+              <div className="model-manager__capability-panel">
+                <div className="model-manager__capability-copy">
+                  <span className="model-manager__section-label">{t("settings.models.capabilities")}</span>
+                  <strong>{t("settings.models.openAiProviderTools")}</strong>
+                  <span>{t("settings.models.openAiProviderToolsDescription")}</span>
+                </div>
+                <div className="model-manager__capability-toggle">
+                  <ToggleSwitch
+                    checked={selectedProvider.compat?.openaiProviderTools?.enabled === true}
+                    label={t("settings.models.enabled")}
+                    onChange={(checked) => updateProviderOpenAiTools({ enabled: checked })}
+                  />
+                  <span>{t("settings.models.enabled")}</span>
+                </div>
+                <label className="settings-field model-manager__capability-path">
+                  {t("settings.models.imageOutputDirectory")}
+                  <input
+                    className="settings-text-input"
+                    placeholder={t("settings.models.imageOutputDirectoryPlaceholder")}
+                    value={selectedProvider.compat?.openaiProviderTools?.outputDirectory ?? ""}
+                    onChange={(event) => updateProviderOpenAiTools({ outputDirectory: event.target.value })}
+                  />
+                </label>
+              </div>
             </section>
             <section className="model-manager__models-panel" aria-label={t("settings.models.models")}>
               <div className="model-manager__models-head">
@@ -539,6 +601,7 @@ function AdvancedModelsManager({ onRefreshRuntime }: { readonly onRefreshRuntime
                     <div className="model-manager__model-extra">
                       <input className="settings-text-input" placeholder={t("settings.models.displayName")} value={model.name ?? ""} onChange={(event) => updateModel(index, (current) => ({ ...current, name: event.target.value }))} />
                       <label className="settings-toggle"><input checked={model.reasoning === true} type="checkbox" onChange={(event) => updateModel(index, (current) => ({ ...current, reasoning: event.target.checked }))} />{t("settings.models.reasoning")}</label>
+                      <label className="settings-toggle"><input checked={model.compat?.openaiProviderTools?.imageGeneration === true} type="checkbox" onChange={(event) => updateModelOpenAiTools(index, { imageGeneration: event.target.checked })} />{t("settings.models.gptImageGeneration")}</label>
                       <button className="button button--secondary" type="button" onClick={() => deleteModel(index)}>{t("settings.models.delete")}</button>
                     </div>
                   </div>

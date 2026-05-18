@@ -117,6 +117,7 @@ export const desktopIpc = {
   getFileDiff: "pi-gui:get-file-diff",
   stageFile: "pi-gui:stage-file",
   unstageFile: "pi-gui:unstage-file",
+  discardFileChanges: "pi-gui:discard-file-changes",
   stageAllFiles: "pi-gui:stage-all-files",
   unstageAllFiles: "pi-gui:unstage-all-files",
   commitStagedChanges: "pi-gui:commit-staged-changes",
@@ -354,6 +355,7 @@ export interface PiDesktopApi {
   getFileDiff(workspaceId: string, filePath: string, staged?: boolean): Promise<string>;
   stageFile(workspaceId: string, filePath: string): Promise<void>;
   unstageFile(workspaceId: string, filePath: string): Promise<void>;
+  discardFileChanges(workspaceId: string, filePath: string): Promise<void>;
   stageAllFiles(workspaceId: string): Promise<void>;
   unstageAllFiles(workspaceId: string): Promise<void>;
   commitStagedChanges(workspaceId: string, message: string): Promise<void>;

@@ -74,6 +74,35 @@ function assertModelEntry(value: unknown, field: string): Record<string, unknown
   if (value.reasoning !== undefined && typeof value.reasoning !== "boolean") {
     fail(`${field}.reasoning`, "must be a boolean");
   }
+  if (value.compat !== undefined) assertCompat(value.compat, `${field}.compat`);
+  return value;
+}
+
+function assertCompat(value: unknown, field: string): Record<string, unknown> {
+  if (!isPlainObject(value)) fail(field, "must be an object");
+  if (value.supportsDeveloperRole !== undefined && typeof value.supportsDeveloperRole !== "boolean") {
+    fail(`${field}.supportsDeveloperRole`, "must be a boolean");
+  }
+  if (value.supportsReasoningEffort !== undefined && typeof value.supportsReasoningEffort !== "boolean") {
+    fail(`${field}.supportsReasoningEffort`, "must be a boolean");
+  }
+  if (value.openaiProviderTools !== undefined) {
+    assertOpenAiProviderToolsCompat(value.openaiProviderTools, `${field}.openaiProviderTools`);
+  }
+  return value;
+}
+
+function assertOpenAiProviderToolsCompat(value: unknown, field: string): Record<string, unknown> {
+  if (!isPlainObject(value)) fail(field, "must be an object");
+  if (value.enabled !== undefined && typeof value.enabled !== "boolean") {
+    fail(`${field}.enabled`, "must be a boolean");
+  }
+  if (value.imageGeneration !== undefined && typeof value.imageGeneration !== "boolean") {
+    fail(`${field}.imageGeneration`, "must be a boolean");
+  }
+  if (value.outputDirectory !== undefined) {
+    assertString(value.outputDirectory, `${field}.outputDirectory`, 4 * 1024);
+  }
   return value;
 }
 
@@ -93,6 +122,7 @@ function assertProviderConfig(value: unknown, field: string): Record<string, unk
   if (value.authHeader !== undefined && typeof value.authHeader !== "boolean") {
     fail(`${field}.authHeader`, "must be a boolean");
   }
+  if (value.compat !== undefined) assertCompat(value.compat, `${field}.compat`);
   if (value.headers !== undefined) assertHeaders(value.headers, `${field}.headers`);
   if (value.models !== undefined) {
     if (!Array.isArray(value.models)) fail(`${field}.models`, "must be an array");

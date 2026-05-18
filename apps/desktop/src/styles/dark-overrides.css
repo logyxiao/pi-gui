@@ -306,6 +306,16 @@
   background: var(--surface-muted);
 }
 
+:root.dark .model-manager__capability-panel {
+  border-color: var(--line);
+  background: var(--surface-muted);
+}
+
+:root.dark .model-manager__capability-toggle {
+  border-color: var(--line);
+  background: var(--surface);
+}
+
 :root.dark .settings-select,
 :root.dark .settings-search,
 :root.dark .settings-text-input {

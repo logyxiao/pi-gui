@@ -37,8 +37,19 @@ describe("normalizeModelsJson", () => {
           usageLastValue: "100",
           usageLastCheckedAt: "2026-05-17",
           enabled: true,
+          compat: {
+            supportsDeveloperRole: true,
+            openaiProviderTools: { enabled: true, imageGeneration: true, outputDirectory: "images" },
+          },
           unknownField: "drop me",
-          models: [{ id: "m1", enabled: true }, "ignore-me"],
+          models: [
+            {
+              id: "m1",
+              enabled: true,
+              compat: { openaiProviderTools: { imageGeneration: true, bad: "drop me" } },
+            },
+            "ignore-me",
+          ],
         },
       },
     });
@@ -46,7 +57,13 @@ describe("normalizeModelsJson", () => {
     expect(provider).toBeDefined();
     expect(provider).not.toHaveProperty("unknownField");
     expect(provider?.headers).toEqual({ "x-test": "1" });
-    expect(provider?.models).toEqual([{ id: "m1", enabled: true }]);
+    expect(provider?.compat).toEqual({
+      supportsDeveloperRole: true,
+      openaiProviderTools: { enabled: true, imageGeneration: true, outputDirectory: "images" },
+    });
+    expect(provider?.models).toEqual([
+      { id: "m1", enabled: true, compat: { openaiProviderTools: { imageGeneration: true } } },
+    ]);
   });
 
   it("drops empty model arrays", () => {
