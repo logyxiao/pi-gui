@@ -90,20 +90,21 @@ export function ArrowDownIcon() {
 export function PiLogoMark() {
   return (
     <svg aria-hidden="true" viewBox="0 0 64 64" fill="none">
-      <rect width="64" height="64" rx="18" fill="#1f2638" />
+      <rect width="64" height="64" fill="#1f2430" />
       <text
         x="50%"
-        y="54%"
+        y="51%"
         textAnchor="middle"
         dominantBaseline="middle"
         fontFamily="SF Pro Display, SF Pro Text, ui-sans-serif, system-ui, sans-serif"
-        fontSize="34"
-        fontStyle="italic"
-        fontWeight="700"
+        fontSize="36"
+        fontWeight="900"
         fill="#ffffff"
       >
         π
       </text>
+      <path d="M41 43.5 44.5 47 41 50.5" stroke="#ffffff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
+      <path d="M47.5 50.5h5" stroke="#5eead4" strokeLinecap="round" strokeWidth="2.5" />
     </svg>
   );
 }
@@ -225,6 +226,24 @@ export function SparkIcon() {
         d="m10 3.1 1.55 3.66 3.66 1.55-3.66 1.55L10 13.5l-1.55-3.64L4.8 8.3l3.65-1.55L10 3.1Zm5 8.6.72 1.58 1.58.72-1.58.72L15 16.3l-.72-1.58-1.58-.72 1.58-.72.72-1.58Z"
         fill="currentColor"
       />
+    </Icon>
+  );
+}
+
+export function PauseCircleIcon() {
+  return (
+    <Icon>
+      <circle cx="10" cy="10" r="6.2" stroke="currentColor" strokeWidth="1.45" />
+      <path d="M8.2 7.55v4.9M11.8 7.55v4.9" stroke="currentColor" strokeLinecap="round" strokeWidth="1.55" />
+    </Icon>
+  );
+}
+
+export function LoadingCircleIcon() {
+  return (
+    <Icon>
+      <circle cx="10" cy="10" r="6.4" stroke="currentColor" strokeOpacity="0.24" strokeWidth="1.8" />
+      <path d="M16.4 10A6.4 6.4 0 0 0 10 3.6" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
     </Icon>
   );
 }

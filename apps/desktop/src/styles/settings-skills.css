@@ -30,10 +30,11 @@
   place-items: center;
 }
 
-.new-thread__logo svg {
-  width: 64px;
-  height: 64px;
+.new-thread__logo img {
+  width: 100%;
+  height: 100%;
   display: block;
+  object-fit: contain;
 }
 
 .new-thread__eyebrow {

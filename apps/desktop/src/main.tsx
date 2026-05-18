@@ -2,9 +2,12 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { useEffect, useState } from "react";
 import App from "./App";
+import { installButtonTooltips } from "./button-tooltips";
 import "./dev-reload-hook";
 import "./styles.css";
 import { I18nProvider, normalizeLanguageCode, type LanguageCode } from "./i18n";
+
+installButtonTooltips();
 
 function Root() {
   const [language, setLanguage] = useState<LanguageCode>(() => normalizeLanguageCode(navigator.language));

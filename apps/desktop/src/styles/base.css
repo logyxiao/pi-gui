@@ -118,6 +118,17 @@ button {
   cursor: pointer;
 }
 
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+summary {
+  cursor: pointer;
+}
+
+button:disabled,
+button[aria-disabled="true"] {
+  cursor: default;
+}
+
 svg {
   width: 16px;
   height: 16px;

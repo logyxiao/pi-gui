@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { PiDesktopApi } from "./ipc";
 import { InlineDiff } from "./diff-inline";
-import { ChevronDownIcon, ChevronRightIcon, MinusIcon, PlusIcon, RefreshIcon, SparkIcon, UndoIcon } from "./icons";
+import { ChevronDownIcon, ChevronRightIcon, LoadingCircleIcon, MinusIcon, PlusIcon, RefreshIcon, SparkIcon, UndoIcon } from "./icons";
 import { extensionToLanguage } from "./syntax-highlight";
 import { useI18n } from "./i18n";
 
@@ -334,10 +334,11 @@ export function DiffPanel({
             aria-busy={generatingMessage}
             className={`icon-button diff-panel__generate-btn${generatingMessage ? " diff-panel__generate-btn--loading" : ""}`}
             type="button"
+            title={t("changes.generateCommitMessage")}
             onClick={handleGenerateMessage}
             disabled={!hasStagedFiles || generatingMessage}
           >
-            <SparkIcon />
+            {generatingMessage ? <LoadingCircleIcon /> : <SparkIcon />}
           </button>
         </div>
         <div className="diff-panel__commit-action-row">

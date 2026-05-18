@@ -761,17 +761,19 @@
 }
 
 .diff-panel__generate-btn--loading {
-  color: var(--icon-active);
+  color: #000;
   opacity: 1;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
 .diff-panel__generate-btn--loading svg {
-  animation: diff-generate-spin 900ms linear infinite;
+  width: 22px;
+  height: 22px;
   transform-origin: 50% 50%;
+  animation: diff-panel-generate-spin 900ms linear infinite;
 }
 
-@keyframes diff-generate-spin {
+@keyframes diff-panel-generate-spin {
   to {
     transform: rotate(360deg);
   }

@@ -1,63 +1,51 @@
 # pi-gui
 
-Electron desktop shell for `pi` sessions. Built for local agent workflows.
+[简体中文](./README.zh-CN.md)
 
-This repo packages a desktop UI around `@earendil-works/pi-coding-agent`. It is not a standalone coding agent runtime. The app depends on the upstream `pi` package for session management, model/auth setup, and agent execution.
+`pi-gui` is a Codex-style Electron desktop app for local [`pi`](https://github.com/earendil-works/pi) coding sessions.
 
-![pi-gui demo](./docs/readme/demo.gif)
+This repository is a modified version of [`minghinmatthewlam/pi-gui`](https://github.com/minghinmatthewlam/pi-gui). The upstream project provides the base desktop shell around `@earendil-works/pi-coding-agent`; this fork keeps that direction and adds product, packaging, Git, model-management, and UI refinements for a more complete local desktop workflow.
 
-## Status
+## What It Is
 
-- Beta (macOS arm64, Linux AppImage)
-- Public source repo
+`pi-gui` is not a separate agent runtime. It is a desktop interface for the upstream `pi` runtime and uses `@earendil-works/pi-coding-agent` for sessions, model/provider authentication, tool execution, skills, extensions, and transcript data.
 
-## Install
+The app is intended for developers who use `pi` locally and want a focused desktop surface for:
 
-### From GitHub Releases
+- opening local workspaces
+- starting and resuming agent sessions
+- viewing transcript and tool activity
+- composing messages with file/image attachments
+- inspecting Git changes and diffs
+- committing and syncing changes
+- managing providers, models, skills, and extensions
+- using an integrated terminal alongside the agent workflow
 
-Download the latest `.dmg` or `.AppImage` from [Releases](https://github.com/minghinmatthewlam/pi-gui/releases).
+## Main Features
 
-Signed and notarized beta releases are the primary direct install path. Drag `pi-gui.app` into `/Applications`, then launch it normally.
+- **Workspace and session management**: add local folders, switch workspaces, create and resume sessions, and preserve desktop UI state.
+- **Conversation-first layout**: transcript, tool timeline, composer, and session state are the primary UI surfaces.
+- **Composer workflow**: model selector, thinking-level selector, slash-command support, queued messages, attachment previews, and context usage display.
+- **Git panel**: staged/unstaged lists, inline diffs, stage/unstage controls, discard changes, AI commit-message generation, commit history, push/sync state, and resizable panel layout.
+- **Model management**: provider/model settings backed by `~/.pi/agent/models.json`, model fetching/testing, usage query settings, enabled model sync, and API type selection.
+- **Provider configuration**: OAuth/API-key provider setup through the desktop settings UI.
+- **Skills and extensions**: inspect and toggle discovered `pi` skills/extensions, including extension commands/tools/diagnostics.
+- **Notifications**: macOS notification onboarding and background completion/failure/attention-needed preferences.
+- **Packaging scripts**: macOS, Windows, Linux, and all-platform package commands are exposed from the root `package.json`.
 
-Linux releases ship as AppImages.
+## Current Status
 
-To update a DMG install, download the latest release and replace the app in `/Applications`.
-
-### With Homebrew
-
-Install from [`minghinmatthewlam/homebrew-tap`](https://github.com/minghinmatthewlam/homebrew-tap):
-
-```bash
-brew tap minghinmatthewlam/tap
-brew install --cask pi-gui
-```
-
-To update a Homebrew install:
-
-```bash
-brew upgrade --cask pi-gui
-```
-
-Homebrew upgrades may behave more like reinstall than in-place patching on macOS. During beta, you may need to re-confirm Dock placement or some permission prompts after upgrading.
-
-### From Source
-
-See [Development](#development) below. Source install is intended for contributors and local development, not the primary end-user install path.
-
-## What It Does
-
-- Opens local workspaces in a desktop shell
-- Lists and resumes `pi` sessions associated with each workspace
-- Creates new sessions and sends prompts through the `pi` runtime
-- Persists desktop UI state such as selected workspace, selected session, and composer draft
+- Primary desktop target: macOS.
+- Linux AppImage packaging is supported for local builds and CI-style checks.
+- Windows packaging scripts exist, but platform-specific validation may require a Windows environment.
+- Live runtime behavior depends on your local `pi` configuration and model credentials.
 
 ## Prerequisites
 
-- Valid model/provider authentication supported by `pi`
-
-On first launch, go to **Settings > Providers** to connect your AI provider via OAuth.
-
-## Development
+- Node.js compatible with this workspace. Current local development uses Node `v24.15.0`.
+- `pnpm` via Corepack.
+- Valid `pi` provider/model authentication.
+- For live agent work, your local `pi` CLI should be able to run successfully.
 
 Install dependencies:
 
@@ -66,69 +54,101 @@ corepack enable
 pnpm install
 ```
 
-Run the desktop app in development:
+## Development
+
+Run the desktop app in development mode:
 
 ```bash
 pnpm dev
 ```
 
-Build everything:
+Equivalent package-scoped command:
+
+```bash
+pnpm --filter @pi-gui/desktop dev
+```
+
+Build all packages:
 
 ```bash
 pnpm build
 ```
 
-Run the default test suite:
+Run type checks:
+
+```bash
+pnpm typecheck
+```
+
+Run tests:
 
 ```bash
 pnpm test
 ```
 
-Desktop E2E lanes and setup are documented in [`apps/desktop/README.md`](./apps/desktop/README.md). The default desktop test command runs the `core` lane; use `pnpm --filter @pi-gui/desktop run test:e2e:all` when you need `core`, `live`, and `native`.
+Desktop-specific test lanes and verification guidance are documented in [`apps/desktop/README.md`](./apps/desktop/README.md).
 
-Package a Linux AppImage locally:
+## Packaging
 
-```bash
-pnpm --filter @pi-gui/desktop run package:linux
-```
-
-Production-like packaged-app checks:
+Root package scripts:
 
 ```bash
-pnpm --filter @pi-gui/desktop run test:prod:packaged-smoke
+pnpm build:desktop:mac
+pnpm build:desktop:win
+pnpm build:desktop:linux
+pnpm build:desktop:all
 ```
 
-Release automation expects these GitHub Actions secrets for signed/notarized macOS builds:
-
-- `CSC_LINK`
-- `CSC_KEY_PASSWORD`
-- `APPLE_API_KEY`
-- `APPLE_API_KEY_ID`
-- `APPLE_API_ISSUER`
-
-Regenerate the README demo assets:
+Desktop package scripts:
 
 ```bash
-pnpm --filter @pi-gui/desktop demo:readme
+pnpm --filter @pi-gui/desktop package:mac
+pnpm --filter @pi-gui/desktop package:win
+pnpm --filter @pi-gui/desktop package:linux
+pnpm --filter @pi-gui/desktop package:all
 ```
+
+Directory-only package builds are also available:
+
+```bash
+pnpm --filter @pi-gui/desktop package:mac:dir
+pnpm --filter @pi-gui/desktop package:win:dir
+pnpm --filter @pi-gui/desktop package:linux:dir
+```
+
+Release output is written under `apps/desktop/release`.
 
 ## Repository Layout
 
-- `apps/desktop`: Electron app and renderer UI
-- `packages/session-driver`: shared session driver types
-- `packages/catalogs`: lightweight workspace/session catalog state
-- `packages/pi-sdk-driver`: adapter from the desktop app to `@earendil-works/pi-coding-agent`
+- `apps/desktop`: Electron main/preload/renderer app, desktop tests, packaging config, native helper build scripts.
+- `apps/website`: website app scaffold.
+- `packages/session-driver`: shared session driver types and runtime-facing contracts.
+- `packages/catalogs`: workspace/session/worktree catalog storage types.
+- `packages/pi-sdk-driver`: adapter layer over `@earendil-works/pi-coding-agent`.
+- `docs`: README media and project documentation.
+- `scripts`: release and install verification helpers.
+
+## Model And Image-Generation Notes
+
+The advanced model manager can preserve and edit `compat.openaiProviderTools` metadata in `~/.pi/agent/models.json`, including model-level `imageGeneration` flags. This is configuration support only. Actual provider-native image generation still depends on a compatible `pi` runtime/plugin/provider combination.
+
+At the time of this README update, `omp-openai-provider-tools` npm versions `0.1.0` through `0.1.4` were tested against local `pi 0.74.1` and failed during extension loading, so this fork does not automatically install that plugin.
 
 ## Known Limitations
 
-- The app currently relies on upstream `pi` behavior and local auth state.
-- Live end-to-end validation may require model credentials not stored in this repo.
-- Homebrew beta upgrades may require macOS to re-confirm some app permissions or Dock placement.
+- The desktop app relies on upstream `pi` behavior and local auth/session state.
+- Live E2E tests require working model credentials and can vary by provider.
+- macOS native picker/clipboard tests require foreground access and appropriate system permissions.
+- Development mode may show Electron CSP warnings that are not shown in packaged builds.
 
-## Acknowledgements
+## Upstream And Attribution
 
-- Built on top of [`@earendil-works/pi-coding-agent`](https://www.npmjs.com/package/@earendil-works/pi-coding-agent)
-- Upstream runtime and ecosystem by [`earendil-works/pi`](https://github.com/earendil-works/pi)
+This project is based on [`minghinmatthewlam/pi-gui`](https://github.com/minghinmatthewlam/pi-gui).
+
+It also depends on:
+
+- [`@earendil-works/pi-coding-agent`](https://www.npmjs.com/package/@earendil-works/pi-coding-agent)
+- [`earendil-works/pi`](https://github.com/earendil-works/pi)
 
 ## License
 

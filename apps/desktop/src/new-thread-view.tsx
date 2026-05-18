@@ -1,7 +1,8 @@
 import { useEffect, useRef, type ClipboardEvent, type DragEvent, type KeyboardEvent, type RefObject } from "react";
 import type { RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
 import type { ComposerAttachment, NewThreadEnvironment, WorkspaceRecord } from "./desktop-state";
-import { ArrowUpIcon, PiLogoMark, PlusIcon } from "./icons";
+import appIconUrl from "./assets/app-icon.png";
+import { ArrowUpIcon, PlusIcon } from "./icons";
 import {
   MODEL_OPTIONS_EMPTY_TITLE,
   type ComposerSlashCommand,
@@ -135,7 +136,7 @@ export function NewThreadView({
       <div className="new-thread">
         <div className="new-thread__hero">
           <div className="new-thread__logo" data-testid="new-thread-logo">
-            <PiLogoMark />
+            <img src={appIconUrl} alt="" />
           </div>
           <div className="new-thread__eyebrow">{t("newThread.title")}</div>
           <h1 className="new-thread__title">{t("newThread.heroTitle")}</h1>
