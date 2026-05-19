@@ -147,6 +147,7 @@
 }
 
 .conversation-nav {
+  --conversation-nav-edge-inset: 22px;
   position: absolute;
   top: 0;
   right: -12px;
@@ -160,8 +161,8 @@
 .conversation-nav__rail {
   position: absolute;
   left: 50%;
-  top: 8px;
-  bottom: 8px;
+  top: var(--conversation-nav-edge-inset);
+  bottom: var(--conversation-nav-edge-inset);
   width: 1px;
   border-radius: 999px;
   background: oklch(82% 0.014 268 / 0.72);
@@ -171,7 +172,7 @@
 .conversation-nav__item {
   position: absolute;
   left: 0;
-  top: calc(8px + (100% - 16px) * var(--timeline-nav-progress));
+  top: calc(var(--conversation-nav-edge-inset) + (100% - (var(--conversation-nav-edge-inset) * 2)) * var(--timeline-nav-progress));
   width: 15px;
   height: 16px;
   overflow: visible;
@@ -232,7 +233,7 @@
 .conversation-nav__popover {
   position: absolute;
   right: calc(100% + 6px);
-  top: calc(8px + (100% - 16px) * var(--timeline-popover-y));
+  top: calc(var(--conversation-nav-edge-inset) + (100% - (var(--conversation-nav-edge-inset) * 2)) * var(--timeline-popover-y));
   width: 278px;
   padding: 8px;
   border: 1px solid var(--line);
@@ -242,6 +243,14 @@
   color: var(--text);
   pointer-events: auto;
   transform: translateY(-50%);
+}
+
+.conversation-nav__popover--below {
+  transform: translateY(0);
+}
+
+.conversation-nav__popover--above {
+  transform: translateY(-100%);
 }
 
 .conversation-nav__popover::after {
@@ -1157,6 +1166,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
   padding: 0;
 }
 
@@ -1165,11 +1175,13 @@
 }
 
 .diff-panel__file-name {
-  flex: 1;
+  min-width: 0;
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
+  overflow: hidden;
   border: none;
   background: none;
   cursor: pointer;
@@ -1177,6 +1189,13 @@
   font-size: 13px;
   font-family: var(--font-mono);
   color: var(--ink);
+}
+
+.diff-panel__file-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .diff-panel__file-name:hover {

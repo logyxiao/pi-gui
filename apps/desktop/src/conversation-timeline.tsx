@@ -555,9 +555,10 @@ function ConversationNavPopover({
   readonly progress: number;
 }) {
   const rows = getConversationNavPopoverRows(transcript, item.index);
+  const placement = progress > 0.74 ? "above" : progress < 0.18 ? "below" : "center";
   return (
     <span
-      className="conversation-nav__popover"
+      className={`conversation-nav__popover conversation-nav__popover--${placement}`}
       role="tooltip"
       style={{ "--timeline-popover-y": progress } as CSSProperties}
     >

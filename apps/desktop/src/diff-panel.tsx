@@ -489,10 +489,11 @@ function ChangeSection({
                   <button
                     className="diff-panel__file-name"
                     type="button"
+                    title={file.path}
                     onClick={() => onSelectFile(isSelected ? null : { path: file.path, group })}
                   >
                     <span className={`diff-panel__status-dot diff-panel__status-dot--${file.status}`} />
-                    <span>{file.path}</span>
+                    <span className="diff-panel__file-path">{file.path}</span>
                   </button>
                   {onDiscardFile ? (
                     <span className="diff-panel__file-action-wrap">
