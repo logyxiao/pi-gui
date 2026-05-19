@@ -129,13 +129,13 @@ function SidebarComponent(props: SidebarProps) {
         <div className="sidebar__command-row">
           <button
             aria-label={t("sidebar.newThread")}
-            className="sidebar__new"
+            className={`icon-button sidebar__command-icon ${activeView === "new-thread" ? "sidebar__command-icon--active" : ""}`}
             type="button"
+            title={t("sidebar.newThread")}
             disabled={!selectedWorkspace}
             onClick={onNewThread}
           >
             <PlusIcon />
-            <span>{t("sidebar.newThread")}</span>
           </button>
           <button
             aria-label={t("sidebar.settings")}

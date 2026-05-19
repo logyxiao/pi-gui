@@ -930,23 +930,6 @@ export default function App({
     void updateSnapshot(api, setSnapshot, () => api.addComposerAttachments(valid));
   }
 
-  const handleClipboardImageShortcut = (
-    event: KeyboardEvent<HTMLTextAreaElement>,
-    onImage: (attachment: ComposerImageAttachment) => void,
-  ): boolean => {
-    if (!(event.metaKey || event.ctrlKey) || event.shiftKey || event.key.toLowerCase() !== "v") {
-      return false;
-    }
-
-    event.preventDefault();
-    void api?.readClipboardImage().then((clipboardImage) => {
-      if (clipboardImage) {
-        onImage(clipboardImage);
-      }
-    });
-    return true;
-  };
-
   const handleSetSessionModel = (provider: string, modelId: string) => {
     if (!selectedWorkspace || !selectedSession) {
       return;
@@ -1180,12 +1163,6 @@ export default function App({
   };
 
   const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (handleClipboardImageShortcut(event, (clipboardImage) => {
-      void updateSnapshot(api, setSnapshot, () => api.addComposerAttachments([clipboardImage]));
-    })) {
-      return;
-    }
-
     if (mentionMenu.handleMentionKeyDown(event)) {
       return;
     }
@@ -1216,12 +1193,6 @@ export default function App({
   };
 
   const handleNewThreadComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (handleClipboardImageShortcut(event, (clipboardImage) => {
-      setNewThreadAttachments((current) => [...current, clipboardImage]);
-    })) {
-      return;
-    }
-
     if (newThreadMentionMenu.handleMentionKeyDown(event)) {
       return;
     }
