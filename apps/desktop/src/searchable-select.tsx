@@ -13,6 +13,7 @@ interface SearchableSelectProps {
   readonly options: readonly SearchableSelectOption[];
   readonly placeholder: string;
   readonly searchPlaceholder?: string;
+  readonly ariaLabel?: string;
   readonly disabled?: boolean;
   readonly className?: string;
   readonly onChange: (value: string) => void;
@@ -30,6 +31,7 @@ export function SearchableSelect({
   options,
   placeholder,
   searchPlaceholder,
+  ariaLabel,
   disabled,
   className,
   onChange,
@@ -149,6 +151,7 @@ export function SearchableSelect({
         type="button"
         disabled={disabled}
         aria-expanded={open}
+        aria-label={ariaLabel}
         onClick={() => setOpen((current) => !current)}
       >
         <span className={selected ? "searchable-select__label" : "searchable-select__placeholder"}>

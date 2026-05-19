@@ -160,6 +160,16 @@
   width: 260px;
 }
 
+.new-thread__workspace.searchable-select {
+  width: min(320px, 100%);
+}
+
+.new-thread__workspace .searchable-select__button {
+  min-height: 38px;
+  border-radius: 999px;
+  background: #fff;
+}
+
 :root.dark .searchable-select__popover,
 :root.dark .searchable-select__search-wrap {
   border-color: var(--line);

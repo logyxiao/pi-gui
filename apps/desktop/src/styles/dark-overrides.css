@@ -355,7 +355,7 @@
   border-top-color: var(--line);
 }
 
-:root.dark .new-thread__workspace {
+:root.dark .new-thread__workspace .searchable-select__button {
   border-color: var(--line);
   background: var(--surface);
 }

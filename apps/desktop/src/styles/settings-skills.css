@@ -62,15 +62,6 @@
   justify-items: center;
 }
 
-.new-thread__workspace {
-  padding: 10px 14px;
-  border-radius: 999px;
-  border: 1px solid #dfe4ee;
-  background: #fff;
-  color: var(--text-strong);
-  font: inherit;
-}
-
 .new-thread__composer {
   width: min(820px, 100%);
   margin: 0 auto;

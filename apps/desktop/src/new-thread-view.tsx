@@ -14,6 +14,7 @@ import { ComposerSurface } from "./composer-surface";
 import { ModelOnboardingNoticeBanner } from "./model-onboarding-notice";
 import type { ModelOnboardingState, ModelOnboardingSettingsSection } from "./model-onboarding";
 import { ModelSelector } from "./model-selector";
+import { SearchableSelect } from "./searchable-select";
 import { useI18n } from "./i18n";
 
 interface NewThreadViewProps {
@@ -140,20 +141,17 @@ export function NewThreadView({
           </div>
           <div className="new-thread__eyebrow">{t("newThread.title")}</div>
           <h1 className="new-thread__title">{t("newThread.heroTitle")}</h1>
-          <label className="new-thread__workspace-picker">
-            <span className="sr-only">{t("newThread.workspaceLabel")}</span>
-            <select
+          <div className="new-thread__workspace-picker">
+            <SearchableSelect
               className="new-thread__workspace"
               value={workspace.id}
-              onChange={(event) => onSelectWorkspace(event.target.value)}
-            >
-              {workspaces.map((entry) => (
-                <option key={entry.id} value={entry.id}>
-                  {entry.name}
-                </option>
-              ))}
-            </select>
-          </label>
+              placeholder={t("newThread.workspaceLabel")}
+              searchPlaceholder={t("newThread.workspaceLabel")}
+              ariaLabel={t("newThread.workspaceLabel")}
+              options={workspaces.map((entry) => ({ value: entry.id, label: entry.name }))}
+              onChange={onSelectWorkspace}
+            />
+          </div>
         </div>
 
         <div className="new-thread__composer composer">

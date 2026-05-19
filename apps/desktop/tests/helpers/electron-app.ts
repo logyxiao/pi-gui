@@ -1438,7 +1438,7 @@ export async function openNewThread(window: Page): Promise<void> {
 export async function expectNewThreadWorkspace(window: Page, workspacePath: string): Promise<void> {
   const workspace = await waitForWorkspaceByPath(window, workspacePath);
   await expect(window.getByTestId("new-thread-composer")).toBeVisible({ timeout: 15_000 });
-  await expect(window.locator(".new-thread__workspace")).toHaveValue(workspace.id);
+  await expect(window.locator(".new-thread__workspace .searchable-select__label")).toHaveText(workspace.name);
 }
 
 export async function startThreadFromSurface(
@@ -1457,7 +1457,9 @@ export async function startThreadFromSurface(
 
   await openNewThread(window);
   if (workspaceName) {
-    await window.locator(".new-thread__workspace").selectOption({ label: workspaceName });
+    const workspacePicker = window.locator(".new-thread__workspace").first();
+    await workspacePicker.locator(".searchable-select__button").click();
+    await window.locator(".searchable-select__popover").getByRole("button", { name: workspaceName }).click();
   }
   if (environment === "worktree") {
     await window.getByRole("button", { name: "Worktree", exact: true }).click();
