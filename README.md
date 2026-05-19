@@ -137,8 +137,7 @@ At the time of this README update, `omp-openai-provider-tools` npm versions `0.1
 ## Known Limitations
 
 - The desktop app relies on upstream `pi` behavior and local auth/session state.
-- Live E2E tests require working model credentials and can vary by provider.
-- macOS native picker/clipboard tests require foreground access and appropriate system permissions.
+- Automated Playwright/Vitest test suites have been removed from this fork; use manual desktop smoke checks for UI changes.
 - Development mode may show Electron CSP warnings that are not shown in packaged builds.
 
 ## Upstream And Attribution

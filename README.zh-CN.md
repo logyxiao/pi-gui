@@ -137,8 +137,7 @@ pnpm --filter @pi-gui/desktop package:linux:dir
 ## 已知限制
 
 - 桌面应用依赖上游 `pi` 行为和本地 auth/session 状态。
-- live E2E 测试需要可用的模型凭据，并可能随 Provider 表现不同而变化。
-- macOS 原生文件选择器/剪贴板测试需要前台权限和相应系统权限。
+- 本 fork 已移除 Playwright/Vitest 自动化测试套件；UI 改动请使用桌面应用手动 smoke 检查。
 - 开发模式可能出现 Electron CSP 警告，打包后不会显示。
 
 ## 上游与致谢

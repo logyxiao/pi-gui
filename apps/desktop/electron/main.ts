@@ -186,7 +186,7 @@ function createWindow(): BrowserWindow {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      // Keep hidden test windows responsive so Playwright exercises the same UI flows.
+      // Keep hidden/minimized windows responsive when launched in background mode.
       backgroundThrottling: !backgroundTestMode,
     },
   });
