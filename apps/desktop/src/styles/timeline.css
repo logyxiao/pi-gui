@@ -818,17 +818,8 @@
 }
 
 .diff-panel__commit-btn--sync {
-  height: 40px;
   border-color: color-mix(in srgb, var(--accent) 82%, var(--border));
-  border-radius: 4px;
   background: color-mix(in srgb, var(--accent) 92%, var(--surface));
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.diff-panel__commit-btn--sync svg {
-  width: 18px;
-  height: 18px;
 }
 
 .diff-panel__commit-btn:hover:not(:disabled),
