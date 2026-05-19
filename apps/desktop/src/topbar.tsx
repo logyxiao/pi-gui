@@ -63,6 +63,7 @@ function TopbarComponent(props: TopbarProps) {
   const selectedProjectOpenApp = getProjectOpenApp(lastProjectOpenApp);
   const projectOpenDisabled = !selectedWorkspace;
   const projectRunDisabled = !selectedWorkspace || !selectedSession;
+  const showEnvironmentPicker = Boolean(selectedWorkspace && activeView === "threads" && activeWorktrees.length > 0);
   const projectRunTitle = projectRunError ||
     (projectStartCommand ? t("topbar.runProjectCommand", { command: projectStartCommand }) : t("topbar.configureProjectStart"));
   const projectOpenTitle = projectOpenError || t("topbar.openProjectIn", { app: selectedProjectOpenApp.label });
@@ -164,7 +165,7 @@ function TopbarComponent(props: TopbarProps) {
         <span className="topbar__workspace">
           {rootWorkspace ? rootWorkspace.name : t("topbar.openFolderToBegin")}
         </span>
-        {selectedWorkspace && activeView === "threads" ? (
+        {showEnvironmentPicker ? (
           <>
             <span className="topbar__separator">/</span>
             <div className="environment-picker" ref={wsMenu.environmentMenuRef}>
@@ -175,7 +176,7 @@ function TopbarComponent(props: TopbarProps) {
                 type="button"
                 onClick={() => wsMenu.setEnvironmentMenuOpen((current) => !current)}
               >
-                {selectedWorkspace.kind === "worktree" ? selectedWorktree?.name ?? selectedWorkspace.name : t("common.local")}
+                {selectedWorkspace?.kind === "worktree" ? selectedWorktree?.name ?? selectedWorkspace.name : t("common.local")}
               </button>
               {wsMenu.environmentMenuOpen && rootWorkspace ? (
                 <div className="workspace-menu environment-picker__menu">

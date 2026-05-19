@@ -5,8 +5,7 @@
 }
 
 :root.dark .topbar {
-  border-bottom-color: var(--line);
-  background: rgba(30, 31, 34, 0.94);
+  background: transparent;
 }
 
 :root.dark .environment-picker__button {
@@ -54,6 +53,25 @@
 
 :root.dark .conversation-nav__item--active .conversation-nav__pill {
   box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.08);
+}
+
+:root.dark .conversation-nav__popover {
+  border-color: color-mix(in oklch, var(--line-strong) 82%, transparent);
+  background: color-mix(in oklch, var(--surface) 92%, black 8%);
+  box-shadow:
+    0 22px 56px rgba(0, 0, 0, 0.46),
+    0 0 0 1px rgba(255, 255, 255, 0.035) inset;
+  color: var(--text);
+}
+
+:root.dark .conversation-nav__popover-row {
+  color: var(--muted-strong);
+}
+
+:root.dark .conversation-nav__popover-row:hover,
+:root.dark .conversation-nav__popover-row--current {
+  background: color-mix(in oklch, var(--accent) 18%, transparent);
+  color: var(--text-strong);
 }
 
 :root.dark .timeline-summary::before,

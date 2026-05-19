@@ -1301,16 +1301,41 @@ export default function App({
   }
 
   const shellClassName = `shell shell--platform-${api.platform}${snapshot.sidebarCollapsed ? " shell--sidebar-collapsed" : ""}`;
+  const topbarShellClassName = `shell-topbar shell-topbar--platform-${api.platform}${snapshot.sidebarCollapsed ? " shell-topbar--sidebar-collapsed" : ""}`;
 
   return (
-    <div className={shellClassName}>
-      {primarySidebarToggleVisible && snapshot.sidebarCollapsed ? (
-        <SidebarToggleButton
-          collapsed={snapshot.sidebarCollapsed}
-          shortcutLabel={sidebarToggleShortcutLabel}
-          onToggle={handleTogglePrimarySidebar}
+    <div className="app-frame">
+      <header className={topbarShellClassName}>
+        {snapshot.sidebarCollapsed && primarySidebarToggleVisible ? (
+          <SidebarToggleButton
+            collapsed={snapshot.sidebarCollapsed}
+            shortcutLabel={sidebarToggleShortcutLabel}
+            onToggle={handleTogglePrimarySidebar}
+          />
+        ) : <div className="topbar-sidebar-spacer" aria-hidden="true" />}
+        <Topbar
+          activeView={snapshot.activeView}
+          rootWorkspace={rootWorkspace}
+          selectedWorkspace={selectedWorkspace}
+          selectedSession={selectedSession}
+          selectedSessionTitle={displayedSessionTitle || selectedSession?.title}
+          selectedWorktree={selectedWorktree}
+          activeWorktrees={activeWorktrees}
+          workspaces={snapshot.workspaces}
+          wsMenu={wsMenu}
+          api={api}
+          lastProjectOpenApp={snapshot.lastProjectOpenApp}
+          projectStartCommand={selectedWorkspace ? snapshot.projectStartCommandsByWorkspace[selectedWorkspace.id] ?? "" : ""}
+          terminalAvailable={Boolean(selectedSessionKey)}
+          terminalVisible={isTerminalVisibleForSelectedThread}
+          onRunProjectStartCommand={handleRunProjectStartCommand}
+          onSetProjectStartCommand={handleSetProjectStartCommand}
+          onToggleTerminal={toggleTerminal}
+          showDiffPanel={showDiffPanel}
+          onToggleDiffPanel={toggleDiffPanel}
         />
-      ) : null}
+      </header>
+      <div className={shellClassName}>
       {!snapshot.sidebarCollapsed ? (
         <Sidebar
           activeView={snapshot.activeView}
@@ -1336,28 +1361,6 @@ export default function App({
       ) : null}
 
       <main className={mainClassName} style={mainStyle}>
-        <Topbar
-          activeView={snapshot.activeView}
-          rootWorkspace={rootWorkspace}
-          selectedWorkspace={selectedWorkspace}
-          selectedSession={selectedSession}
-          selectedSessionTitle={displayedSessionTitle || selectedSession?.title}
-          selectedWorktree={selectedWorktree}
-          activeWorktrees={activeWorktrees}
-          workspaces={snapshot.workspaces}
-          wsMenu={wsMenu}
-          api={api}
-          lastProjectOpenApp={snapshot.lastProjectOpenApp}
-          projectStartCommand={selectedWorkspace ? snapshot.projectStartCommandsByWorkspace[selectedWorkspace.id] ?? "" : ""}
-          terminalAvailable={Boolean(selectedSessionKey)}
-          terminalVisible={isTerminalVisibleForSelectedThread}
-          onRunProjectStartCommand={handleRunProjectStartCommand}
-          onSetProjectStartCommand={handleSetProjectStartCommand}
-          onToggleTerminal={toggleTerminal}
-          showDiffPanel={showDiffPanel}
-          onToggleDiffPanel={toggleDiffPanel}
-        />
-
         {showTerminalTakeover ? (
           terminalPanel
         ) : (
@@ -1548,6 +1551,7 @@ export default function App({
           />
         ) : null}
       </main>
+      </div>
       {confirmDialog ? (
         <ConfirmDialog
           cancelLabel={confirmDialog.cancelLabel}

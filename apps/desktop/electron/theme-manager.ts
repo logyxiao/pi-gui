@@ -2,6 +2,15 @@ import { nativeTheme, type BrowserWindow } from "electron";
 import { desktopIpc } from "../src/ipc";
 import type { ThemeMode } from "../src/desktop-state";
 
+const THEME_BACKGROUND_COLORS = {
+  dark: "#1e1f22",
+  light: "#fbfbfd",
+} as const;
+
+export function getThemeBackgroundColor(theme: "light" | "dark"): string {
+  return THEME_BACKGROUND_COLORS[theme];
+}
+
 export class ThemeManager {
   private mode: ThemeMode = "system";
   private window: BrowserWindow | null = null;
@@ -14,6 +23,7 @@ export class ThemeManager {
 
   setWindow(win: BrowserWindow) {
     this.window = win;
+    this.applyWindowTheme();
   }
 
   getMode(): ThemeMode {
@@ -38,6 +48,12 @@ export class ThemeManager {
   }
 
   private broadcast() {
-    this.window?.webContents.send(desktopIpc.themeChanged, this.getResolvedTheme());
+    const resolvedTheme = this.getResolvedTheme();
+    this.applyWindowTheme(resolvedTheme);
+    this.window?.webContents.send(desktopIpc.themeChanged, resolvedTheme);
+  }
+
+  private applyWindowTheme(theme = this.getResolvedTheme()) {
+    this.window?.setBackgroundColor(getThemeBackgroundColor(theme));
   }
 }

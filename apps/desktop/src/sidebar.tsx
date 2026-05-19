@@ -49,6 +49,71 @@ interface SidebarProps {
   readonly onUnarchiveSession: (target: { workspaceId: string; sessionId: string }) => void;
 }
 
+export function SidebarTopControls({
+  activeView,
+  selectedWorkspace,
+  sidebarCollapsed,
+  sidebarToggleVisible,
+  sidebarToggleShortcutLabel,
+  onToggleSidebar,
+  onNewThread,
+  onOpenSettings,
+}: Pick<SidebarProps,
+  | "activeView"
+  | "selectedWorkspace"
+  | "sidebarCollapsed"
+  | "sidebarToggleVisible"
+  | "sidebarToggleShortcutLabel"
+  | "onToggleSidebar"
+  | "onNewThread"
+  | "onOpenSettings"
+>) {
+  const { t } = useI18n();
+
+  return (
+    <div className="sidebar__top">
+      <div className="sidebar__command-row">
+        <button
+          aria-label={t("sidebar.newThread")}
+          className={`icon-button sidebar__command-icon ${activeView === "new-thread" ? "sidebar__command-icon--active" : ""}`}
+          type="button"
+          title={t("sidebar.newThread")}
+          disabled={!selectedWorkspace}
+          onClick={onNewThread}
+        >
+          <PlusIcon />
+        </button>
+        <button
+          aria-label={t("sidebar.settings")}
+          className={`icon-button sidebar__command-icon ${activeView === "settings" ? "sidebar__command-icon--active" : ""}`}
+          type="button"
+          onClick={() => onOpenSettings(selectedWorkspace?.rootWorkspaceId ?? selectedWorkspace?.id)}
+        >
+          <SettingsIcon />
+        </button>
+        {sidebarToggleVisible ? (
+          <div className="shortcut-tooltip-wrap sidebar__toggle-wrap">
+            <button
+              aria-label={t("sidebar.toggle")}
+              aria-pressed={!sidebarCollapsed}
+              className="icon-button sidebar__command-icon"
+              data-testid="sidebar-toggle"
+              type="button"
+              onClick={onToggleSidebar}
+            >
+              <SidebarToggleIcon />
+            </button>
+            <span className="shortcut-tooltip sidebar__command-tooltip" role="tooltip">
+              <span>Toggle sidebar</span>
+              <kbd>{sidebarToggleShortcutLabel}</kbd>
+            </span>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function SidebarComponent(props: SidebarProps) {
   const {
     activeView,
@@ -125,46 +190,16 @@ function SidebarComponent(props: SidebarProps) {
 
   return (
     <aside className="sidebar">
-      <div className="sidebar__top">
-        <div className="sidebar__command-row">
-          <button
-            aria-label={t("sidebar.newThread")}
-            className={`icon-button sidebar__command-icon ${activeView === "new-thread" ? "sidebar__command-icon--active" : ""}`}
-            type="button"
-            title={t("sidebar.newThread")}
-            disabled={!selectedWorkspace}
-            onClick={onNewThread}
-          >
-            <PlusIcon />
-          </button>
-          <button
-            aria-label={t("sidebar.settings")}
-            className={`icon-button sidebar__command-icon ${activeView === "settings" ? "sidebar__command-icon--active" : ""}`}
-            type="button"
-            onClick={() => onOpenSettings(selectedWorkspace?.rootWorkspaceId ?? selectedWorkspace?.id)}
-          >
-            <SettingsIcon />
-          </button>
-          {sidebarToggleVisible ? (
-            <div className="shortcut-tooltip-wrap sidebar__toggle-wrap">
-              <button
-                aria-label={t("sidebar.toggle")}
-                aria-pressed={!sidebarCollapsed}
-                className="icon-button sidebar__command-icon"
-                data-testid="sidebar-toggle"
-                type="button"
-                onClick={onToggleSidebar}
-              >
-                <SidebarToggleIcon />
-              </button>
-              <span className="shortcut-tooltip sidebar__command-tooltip" role="tooltip">
-                <span>Toggle sidebar</span>
-                <kbd>{sidebarToggleShortcutLabel}</kbd>
-              </span>
-            </div>
-          ) : null}
-        </div>
-      </div>
+      <SidebarTopControls
+        activeView={activeView}
+        selectedWorkspace={selectedWorkspace}
+        sidebarCollapsed={sidebarCollapsed}
+        sidebarToggleVisible={sidebarToggleVisible}
+        sidebarToggleShortcutLabel={sidebarToggleShortcutLabel}
+        onToggleSidebar={onToggleSidebar}
+        onNewThread={onNewThread}
+        onOpenSettings={onOpenSettings}
+      />
 
       <div className="sidebar__section">
         <div className="section__head">

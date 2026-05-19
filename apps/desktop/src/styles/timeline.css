@@ -669,12 +669,12 @@
   background: var(--surface);
   overflow: hidden;
   grid-column: 2;
-  grid-row: 2 / -1;
+  grid-row: 1 / -1;
   position: relative;
 }
 
 .main--with-diff.main--with-terminal > .diff-panel {
-  grid-row: 2 / span 3;
+  grid-row: 1 / span 3;
 }
 
 .diff-panel__resize-handle {
@@ -1163,9 +1163,10 @@
 }
 
 .diff-panel__file {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 26px 34px;
   align-items: center;
-  gap: 6px;
+  column-gap: 6px;
   min-width: 0;
   padding: 0;
 }
@@ -1176,7 +1177,6 @@
 
 .diff-panel__file-name {
   min-width: 0;
-  flex: 1 1 auto;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1230,7 +1230,7 @@
   position: relative;
   display: inline-grid;
   place-items: center;
-  flex: 0 0 auto;
+  justify-self: center;
 }
 
 .diff-panel__file-action-tooltip {
@@ -1275,7 +1275,7 @@
 }
 
 .diff-panel__stage-btn {
-  margin-right: 8px;
+  justify-self: start;
 }
 
 .diff-panel__discard-btn svg,

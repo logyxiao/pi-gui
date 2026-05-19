@@ -51,7 +51,7 @@ import {
   NotificationPermissionService,
 } from "./notification-permission";
 import { checkForUpdate, initUpdateChecker } from "./update-checker";
-import { ThemeManager } from "./theme-manager";
+import { getThemeBackgroundColor, ThemeManager } from "./theme-manager";
 import { TerminalService } from "./terminal-service";
 import {
   fetchProviderModels,
@@ -187,7 +187,7 @@ function readClipboardImageAttachment(): ComposerImageAttachment | null {
 
 function createWindow(): BrowserWindow {
   const backgroundTestMode = windowTestMode === "background";
-  const initialBackground = themeManager.getResolvedTheme() === "dark" ? "#1f2024" : "#f3f4f8";
+  const initialBackground = getThemeBackgroundColor(themeManager.getResolvedTheme());
   const window = new BrowserWindow({
     width: 1480,
     height: 980,
