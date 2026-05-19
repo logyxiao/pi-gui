@@ -33,6 +33,7 @@ import type {
   WorkspaceSessionTarget,
 } from "../src/desktop-state";
 import type { CcSwitchSyncResult, ModelsJsonFile, ModelsJsonSaveResult, ProviderProbeResult } from "../src/models-json";
+import type { ProjectOpenAppId } from "../src/project-open-apps";
 
 const devReloadMarkersEnabled = process.env.PI_APP_DEV_RELOAD_MARKERS === "1";
 
@@ -91,6 +92,10 @@ contextBridge.exposeInMainWorld("piApp", {
     ipcRenderer.invoke(desktopIpc.reorderWorkspaces, workspaceOrder) as Promise<DesktopAppState>,
   openWorkspaceInFinder: (workspaceId: string) =>
     ipcRenderer.invoke(desktopIpc.openWorkspaceInFinder, workspaceId) as Promise<void>,
+  openWorkspaceInApp: (workspaceId: string, appId: ProjectOpenAppId) =>
+    ipcRenderer.invoke(desktopIpc.openWorkspaceInApp, workspaceId, appId) as Promise<DesktopAppState>,
+  setProjectStartCommand: (workspaceId: string, command: string) =>
+    ipcRenderer.invoke(desktopIpc.setProjectStartCommand, workspaceId, command) as Promise<DesktopAppState>,
   createWorktree: (input: CreateWorktreeInput) =>
     ipcRenderer.invoke(desktopIpc.createWorktree, input) as Promise<DesktopAppState>,
   removeWorktree: (input: RemoveWorktreeInput) =>

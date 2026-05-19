@@ -322,6 +322,7 @@ export default function App({
     isTerminalTakeoverForSelectedThread,
     isTerminalVisibleForSelectedThread,
     terminalHeight,
+    showTerminal,
     toggleTerminal,
     toggleTerminalTakeover,
   } = useTerminalPanelController({
@@ -339,6 +340,23 @@ export default function App({
     preserveBottomForLayoutChange(3);
     setShowDiffPanel((prev) => !prev);
   }, [preserveBottomForLayoutChange]);
+
+  const handleSetProjectStartCommand = useCallback((workspaceId: string, command: string) => {
+    if (!api) {
+      return Promise.resolve();
+    }
+    return updateSnapshot(api, setSnapshot, () => api.setProjectStartCommand(workspaceId, command)).then(() => undefined);
+  }, [api]);
+
+  const handleRunProjectStartCommand = useCallback(async (command: string) => {
+    const normalizedCommand = command.trim();
+    if (!api || !selectedWorkspace || !selectedSession || !normalizedCommand) {
+      return;
+    }
+    showTerminal();
+    const nextPanel = await api.createTerminalSession(selectedWorkspace.id, selectedSession.id, { cols: 100, rows: 24 });
+    await api.writeTerminal(nextPanel.activeSessionId, `${normalizedCommand}\n`);
+  }, [api, selectedSession, selectedWorkspace, showTerminal]);
 
   const openSettings = useCallback((workspaceId?: string, section?: SettingsSection) => {
     if (!api) {
@@ -1329,8 +1347,12 @@ export default function App({
           workspaces={snapshot.workspaces}
           wsMenu={wsMenu}
           api={api}
+          lastProjectOpenApp={snapshot.lastProjectOpenApp}
+          projectStartCommand={selectedWorkspace ? snapshot.projectStartCommandsByWorkspace[selectedWorkspace.id] ?? "" : ""}
           terminalAvailable={Boolean(selectedSessionKey)}
           terminalVisible={isTerminalVisibleForSelectedThread}
+          onRunProjectStartCommand={handleRunProjectStartCommand}
+          onSetProjectStartCommand={handleSetProjectStartCommand}
           onToggleTerminal={toggleTerminal}
           showDiffPanel={showDiffPanel}
           onToggleDiffPanel={toggleDiffPanel}

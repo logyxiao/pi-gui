@@ -23,10 +23,12 @@ import {
   type MenuItemConstructorOptions,
   type MessageBoxOptions,
 } from "electron";
+import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { promisify } from "node:util";
 import { DesktopAppStore } from "./app-store";
 import {
   commitStagedChanges,
@@ -62,6 +64,7 @@ import {
 } from "./models-json-service";
 import type { DesktopAppState, LanguageMode, ThemeMode } from "../src/desktop-state";
 import { desktopIpc, getDesktopCommandFromShortcut } from "../src/ipc";
+import { getProjectOpenApp, isProjectOpenAppId, type ProjectOpenAppId } from "../src/project-open-apps";
 import { SUPPORTED_COMPOSER_IMAGE_TYPES } from "../src/composer-attachments";
 import type {
   ComposerAttachment,
@@ -97,6 +100,7 @@ let stopPruningTerminals: (() => void) | undefined;
 let retainedTerminalWorkspacePathSignature = "";
 const terminalFocusedWebContentsIds = new Set<number>();
 let quittingAfterStoreFlush = false;
+const execFileAsync = promisify(execFile);
 
 const SUPPORTED_IMAGE_TYPES = SUPPORTED_COMPOSER_IMAGE_TYPES;
 const SUPPORTED_IMAGE_MIME_TYPES = new Set<string>(SUPPORTED_IMAGE_TYPES.map((type) => type.mimeType));
@@ -119,6 +123,19 @@ function registerRendererIpc(channel: string, handler: RendererIpcHandler): void
   }
   registeredIpcHandlers.set(channel, { exposedTo: "renderer" });
   ipcMain.handle(channel, handler);
+}
+
+async function openWorkspacePathInApp(workspacePath: string, appId: ProjectOpenAppId): Promise<void> {
+  if (appId === "finder") {
+    const openError = await shell.openPath(workspacePath);
+    if (openError) {
+      throw new Error(openError);
+    }
+    return;
+  }
+
+  const appRecord = getProjectOpenApp(appId);
+  await execFileAsync("open", ["-a", appRecord.macAppName, workspacePath]);
 }
 
 function getTerminalService(): TerminalService {
@@ -600,6 +617,24 @@ app.whenReady().then(async () => {
     }
     await shell.openPath(workspacePath);
   });
+  registerRendererIpc(desktopIpc.openWorkspaceInApp, async (_event, workspaceId: string, appIdInput: unknown) => {
+    const targetWorkspaceId = assertWorkspaceId(workspaceId);
+    const workspacePath = store.getWorkspacePath(targetWorkspaceId);
+    if (!workspacePath) {
+      throw new Error(`Unknown workspace: ${targetWorkspaceId}`);
+    }
+    if (!isProjectOpenAppId(appIdInput)) {
+      throw new Error("Invalid project open app");
+    }
+    await openWorkspacePathInApp(workspacePath, appIdInput);
+    return store.setLastProjectOpenApp(appIdInput);
+  });
+  registerRendererIpc(desktopIpc.setProjectStartCommand, (_event, workspaceId: string, command: string) =>
+    store.setProjectStartCommand(
+      assertWorkspaceId(workspaceId),
+      assertString(command, "projectStartCommand", 4096),
+    ),
+  );
   registerRendererIpc(desktopIpc.createWorktree, (_event, input: CreateWorktreeInput) =>
     store.createWorktree(input),
   );

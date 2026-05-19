@@ -25,6 +25,17 @@ export function TerminalIcon() {
   );
 }
 
+export function PlayIcon() {
+  return (
+    <Icon>
+      <path
+        d="M6.25 4.9v10.2a1 1 0 0 0 1.54.84l7.9-5.1a1 1 0 0 0 0-1.68l-7.9-5.1a1 1 0 0 0-1.54.84Z"
+        fill="currentColor"
+      />
+    </Icon>
+  );
+}
+
 export function SidebarToggleIcon() {
   return (
     <Icon>

@@ -766,6 +766,52 @@
   color: var(--text-strong);
 }
 
+:root.dark .project-action__control {
+  border-color: var(--line);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--icon) 7%, transparent);
+}
+
+:root.dark .project-action__control .topbar__icon {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+:root.dark .project-action__chevron {
+  border-left-color: var(--line) !important;
+}
+
+:root.dark .project-action__menu {
+  border-color: var(--line);
+  background: rgba(40, 42, 48, 0.98);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+}
+
+:root.dark .project-action__item {
+  color: var(--text-strong);
+}
+
+:root.dark .project-action__item:hover,
+:root.dark .project-action__item:focus-visible,
+:root.dark .project-action__item--active {
+  background: var(--surface-muted);
+}
+
+:root.dark .project-action__app-icon,
+:root.dark .project-action__input,
+:root.dark .project-action__text-button {
+  border-color: var(--line);
+  background: var(--surface-muted);
+  color: var(--text-strong);
+}
+
+:root.dark .project-action__text-button--primary {
+  border-color: var(--icon-active);
+  background: var(--icon-active);
+  color: #ffffff;
+}
+
 :root.dark .shortcut-tooltip {
   border-color: var(--line);
   background: rgba(40, 42, 48, 0.96);

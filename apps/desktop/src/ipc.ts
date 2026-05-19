@@ -24,6 +24,7 @@ import type {
   ModelsJsonSaveResult,
   ProviderProbeResult,
 } from "./models-json";
+import type { ProjectOpenAppId } from "./project-open-apps";
 
 export type DesktopNotificationPermissionStatus =
   | "granted"
@@ -47,6 +48,8 @@ export const desktopIpc = {
   removeWorkspace: "pi-gui:remove-workspace",
   reorderWorkspaces: "pi-gui:reorder-workspaces",
   openWorkspaceInFinder: "pi-gui:open-workspace-in-finder",
+  openWorkspaceInApp: "pi-gui:open-workspace-in-app",
+  setProjectStartCommand: "pi-gui:set-project-start-command",
   createWorktree: "pi-gui:create-worktree",
   removeWorktree: "pi-gui:remove-worktree",
   openSkillInFinder: "pi-gui:open-skill-in-finder",
@@ -249,6 +252,8 @@ export interface PiDesktopApi {
   removeWorkspace(workspaceId: string): Promise<DesktopAppState>;
   reorderWorkspaces(workspaceOrder: readonly string[]): Promise<DesktopAppState>;
   openWorkspaceInFinder(workspaceId: string): Promise<void>;
+  openWorkspaceInApp(workspaceId: string, appId: ProjectOpenAppId): Promise<DesktopAppState>;
+  setProjectStartCommand(workspaceId: string, command: string): Promise<DesktopAppState>;
   createWorktree(input: CreateWorktreeInput): Promise<DesktopAppState>;
   removeWorktree(input: RemoveWorktreeInput): Promise<DesktopAppState>;
   openSkillInFinder(workspaceId: string, filePath: string): Promise<void>;

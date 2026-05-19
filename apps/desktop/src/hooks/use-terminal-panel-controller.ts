@@ -47,6 +47,13 @@ export function useTerminalPanelController({
     setOpenTerminalSessionKeys((current) => new Set(current).add(selectedSessionKey));
   }, [openTerminalSessionKeys, selectedSessionKey]);
 
+  const showTerminal = useCallback(() => {
+    if (!selectedSessionKey) {
+      return;
+    }
+    setOpenTerminalSessionKeys((current) => new Set(current).add(selectedSessionKey));
+  }, [selectedSessionKey]);
+
   const handleTerminalHeightChange = useCallback((nextHeight: number) => {
     setTerminalHeight(nextHeight);
     setTakeoverTerminalSessionKeys((current) => {
@@ -88,6 +95,7 @@ export function useTerminalPanelController({
     isTerminalTakeoverForSelectedThread,
     isTerminalVisibleForSelectedThread,
     terminalHeight,
+    showTerminal,
     toggleTerminal,
     toggleTerminalTakeover,
   };

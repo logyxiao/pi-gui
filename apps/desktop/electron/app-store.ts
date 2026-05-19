@@ -51,6 +51,7 @@ import {
   type TranscriptMessage,
   type WorkspaceSessionTarget,
 } from "../src/desktop-state";
+import type { ProjectOpenAppId } from "../src/project-open-apps";
 import {
   applyTimelineEvent,
   appendAssistantDelta,
@@ -510,6 +511,44 @@ export class DesktopAppStore implements AppStoreInternals {
     return this.emit();
   }
 
+  async setLastProjectOpenApp(lastProjectOpenApp: ProjectOpenAppId): Promise<DesktopAppState> {
+    await this.initialize();
+    if (this.state.lastProjectOpenApp === lastProjectOpenApp) {
+      return this.emit();
+    }
+    this.state = {
+      ...this.state,
+      lastProjectOpenApp,
+      lastError: undefined,
+      revision: this.state.revision + 1,
+    };
+    await this.persistUiState();
+    return this.emit();
+  }
+
+  async setProjectStartCommand(workspaceId: string, command: string): Promise<DesktopAppState> {
+    await this.initialize();
+    const normalizedCommand = command.trim();
+    const currentCommand = this.state.projectStartCommandsByWorkspace[workspaceId] ?? "";
+    if (currentCommand === normalizedCommand) {
+      return this.emit();
+    }
+    const projectStartCommandsByWorkspace = { ...this.state.projectStartCommandsByWorkspace };
+    if (normalizedCommand) {
+      projectStartCommandsByWorkspace[workspaceId] = normalizedCommand;
+    } else {
+      delete projectStartCommandsByWorkspace[workspaceId];
+    }
+    this.state = {
+      ...this.state,
+      projectStartCommandsByWorkspace,
+      lastError: undefined,
+      revision: this.state.revision + 1,
+    };
+    await this.persistUiState();
+    return this.emit();
+  }
+
   async setModelSettingsScopeMode(modelSettingsScopeMode: ModelSettingsScopeMode): Promise<DesktopAppState> {
     await this.initialize();
     if (this.state.modelSettingsScopeMode === modelSettingsScopeMode) {
@@ -668,6 +707,8 @@ export class DesktopAppStore implements AppStoreInternals {
           ...persisted.notificationPreferences,
         },
         integratedTerminalShell: persisted.integratedTerminalShell ?? this.state.integratedTerminalShell,
+        lastProjectOpenApp: persisted.lastProjectOpenApp ?? this.state.lastProjectOpenApp,
+        projectStartCommandsByWorkspace: persisted.projectStartCommandsByWorkspace ?? {},
         lastViewedAtBySession: persisted.lastViewedAtBySession ?? {},
         workspaceOrder: persisted.workspaceOrder ?? [],
         sidebarCollapsed: persisted.sidebarCollapsed ?? this.state.sidebarCollapsed,
@@ -1609,6 +1650,11 @@ export class DesktopAppStore implements AppStoreInternals {
       extensionCommandCompatibilityByWorkspace: serializeCompatibilityByWorkspace(this.extensionCommandCompatibilityByWorkspace),
       notificationPreferences: this.state.notificationPreferences,
       integratedTerminalShell: this.state.integratedTerminalShell || undefined,
+      lastProjectOpenApp: this.state.lastProjectOpenApp,
+      projectStartCommandsByWorkspace:
+        Object.keys(this.state.projectStartCommandsByWorkspace).length > 0
+          ? this.state.projectStartCommandsByWorkspace
+          : undefined,
       lastViewedAtBySession: mapToRecord(this.sessionState.lastViewedAtBySession),
       workspaceOrder: this.state.workspaceOrder.length > 0 ? this.state.workspaceOrder : undefined,
       modelSettingsScopeMode: this.state.modelSettingsScopeMode,

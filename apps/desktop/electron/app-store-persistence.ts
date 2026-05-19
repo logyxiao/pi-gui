@@ -5,13 +5,14 @@ import type {
   NotificationPreferences,
 } from "../src/desktop-state";
 import type { ModelSettingsSnapshot } from "@pi-gui/session-driver/runtime-types";
+import { isProjectOpenAppId, type ProjectOpenAppId } from "../src/project-open-apps";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 const uiStateWriteQueueByPath = new Map<string, Promise<void>>();
 export interface PersistedUiState {
-  readonly version?: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+  readonly version?: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
   readonly selectedWorkspaceId?: string;
   readonly selectedSessionId?: string;
   readonly activeView?: AppView;
@@ -20,6 +21,8 @@ export interface PersistedUiState {
   readonly extensionCommandCompatibilityByWorkspace?: Record<string, readonly ExtensionCommandCompatibilityRecord[]>;
   readonly notificationPreferences?: NotificationPreferences;
   readonly integratedTerminalShell?: string;
+  readonly lastProjectOpenApp?: ProjectOpenAppId;
+  readonly projectStartCommandsByWorkspace?: Record<string, string>;
   readonly lastViewedAtBySession?: Record<string, string>;
   readonly workspaceOrder?: readonly string[];
   readonly modelSettingsScopeMode?: ModelSettingsScopeMode;
@@ -38,7 +41,9 @@ export async function readPersistedUiState(uiStateFilePath: string): Promise<Leg
     const parsed = JSON.parse(raw) as LegacyPersistedUiState;
     return {
       version:
-        parsed.version === 9
+        parsed.version === 10
+          ? 10
+          : parsed.version === 9
           ? 9
           : parsed.version === 8
             ? 8
@@ -64,6 +69,8 @@ export async function readPersistedUiState(uiStateFilePath: string): Promise<Leg
       notificationPreferences: parsed.notificationPreferences,
       integratedTerminalShell:
         typeof parsed.integratedTerminalShell === "string" ? parsed.integratedTerminalShell : undefined,
+      lastProjectOpenApp: isProjectOpenAppId(parsed.lastProjectOpenApp) ? parsed.lastProjectOpenApp : undefined,
+      projectStartCommandsByWorkspace: toStringRecord(parsed.projectStartCommandsByWorkspace),
       lastViewedAtBySession: parsed.lastViewedAtBySession,
       workspaceOrder: Array.isArray(parsed.workspaceOrder) ? parsed.workspaceOrder : undefined,
       modelSettingsScopeMode:
@@ -88,7 +95,7 @@ export async function writePersistedUiState(
     await mkdir(dirname(uiStateFilePath), { recursive: true });
     const serialized = `${JSON.stringify(
       {
-        version: 9,
+        version: 10,
         ...payload,
       } satisfies PersistedUiState,
       null,
@@ -122,6 +129,19 @@ export async function writePersistedUiState(
       }
     }
   });
+}
+
+function toStringRecord(value: unknown): Record<string, string> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  const result: Record<string, string> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (typeof key === "string" && typeof entry === "string") {
+      result[key] = entry;
+    }
+  }
+  return result;
 }
 
 function toPersistedModelSettingsSnapshot(value: unknown): ModelSettingsSnapshot | undefined {

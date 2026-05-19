@@ -1,5 +1,6 @@
 import type { HostUiRequest, SessionConfig, SessionContextUsage } from "@pi-gui/session-driver";
 import type { ModelSettingsSnapshot, RuntimeCommandRecord, RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
+import { DEFAULT_PROJECT_OPEN_APP_ID, type ProjectOpenAppId } from "./project-open-apps";
 export type SessionStatus = "idle" | "running" | "failed";
 export type { SessionRole, TranscriptMessage } from "./timeline-types";
 import type { TranscriptMessage } from "./timeline-types";
@@ -171,6 +172,8 @@ export interface DesktopAppState {
   readonly extensionCommandCompatibilityByWorkspace: Readonly<Record<string, readonly ExtensionCommandCompatibilityRecord[]>>;
   readonly notificationPreferences: NotificationPreferences;
   readonly integratedTerminalShell: string;
+  readonly lastProjectOpenApp: ProjectOpenAppId;
+  readonly projectStartCommandsByWorkspace: Readonly<Record<string, string>>;
   readonly lastViewedAtBySession: Readonly<Record<string, string>>;
   readonly workspaceOrder: readonly string[];
   readonly modelSettingsScopeMode: ModelSettingsScopeMode;
@@ -212,6 +215,8 @@ export function createEmptyDesktopAppState(): DesktopAppState {
       attentionNeeded: true,
     },
     integratedTerminalShell: "",
+    lastProjectOpenApp: DEFAULT_PROJECT_OPEN_APP_ID,
+    projectStartCommandsByWorkspace: {},
     lastViewedAtBySession: {},
     workspaceOrder: [],
     modelSettingsScopeMode: "app-global",
