@@ -39,6 +39,8 @@ export function useTimelineController({
   const exactBottomRestoreSessionKeyRef = useRef<string | null>(null);
   const deferredPinnedBottomAlignmentRef = useRef(false);
   const pendingPinnedBottomBehaviorRef = useRef<ScrollBehavior>("auto");
+  const pendingIncrementalBottomFrameRef = useRef<number | null>(null);
+  const lastObservedScrollHeightRef = useRef(0);
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const [timelinePaneMountVersion, setTimelinePaneMountVersion] = useState(0);
   const [disableTimelineVirtualization, setDisableTimelineVirtualization] = useState(true);
@@ -55,13 +57,20 @@ export function useTimelineController({
       return;
     }
 
+    if (pendingIncrementalBottomFrameRef.current != null) {
+      window.cancelAnimationFrame(pendingIncrementalBottomFrameRef.current);
+      pendingIncrementalBottomFrameRef.current = null;
+    }
+
     const align = (remainingChecks: number) => {
+      const targetScrollTop = Math.max(0, pane.scrollHeight - pane.clientHeight);
       if (behavior === "auto") {
-        pane.scrollTop = pane.scrollHeight;
+        pane.scrollTop = targetScrollTop;
       } else {
-        pane.scrollTo({ top: pane.scrollHeight, behavior });
+        pane.scrollTo({ top: targetScrollTop, behavior });
       }
       pinnedToBottomRef.current = true;
+      lastObservedScrollHeightRef.current = pane.scrollHeight;
       lastTimelineScrollTopBySessionRef.current.set(selectedSessionKey, pane.scrollTop);
       lastTimelinePinnedBySessionRef.current.set(selectedSessionKey, true);
       setShowJumpToLatest(false);
@@ -79,6 +88,37 @@ export function useTimelineController({
     };
 
     align(6);
+  }, [selectedSessionKey]);
+
+  const requestIncrementalBottomAlignment = useCallback(() => {
+    if (pendingIncrementalBottomFrameRef.current != null) {
+      return;
+    }
+
+    pendingIncrementalBottomFrameRef.current = window.requestAnimationFrame(() => {
+      pendingIncrementalBottomFrameRef.current = null;
+      const pane = timelinePaneRef.current;
+      if (!pane || (!pinnedToBottomRef.current && !preserveBottomOnNextPaneResizeRef.current)) {
+        return;
+      }
+
+      const previousScrollHeight = lastObservedScrollHeightRef.current || pane.scrollHeight;
+      const nextScrollHeight = pane.scrollHeight;
+      const heightDelta = nextScrollHeight - previousScrollHeight;
+      const targetScrollTop = Math.max(0, nextScrollHeight - pane.clientHeight);
+
+      if (heightDelta > 0 && pane.scrollTop < targetScrollTop) {
+        pane.scrollTop = Math.min(targetScrollTop, pane.scrollTop + heightDelta);
+      } else {
+        pane.scrollTop = targetScrollTop;
+      }
+
+      pinnedToBottomRef.current = true;
+      lastObservedScrollHeightRef.current = nextScrollHeight;
+      lastTimelineScrollTopBySessionRef.current.set(selectedSessionKey, pane.scrollTop);
+      lastTimelinePinnedBySessionRef.current.set(selectedSessionKey, true);
+      setShowJumpToLatest(false);
+    });
   }, [selectedSessionKey]);
 
   const requestPinnedBottomAlignment = useCallback((
@@ -172,6 +212,7 @@ export function useTimelineController({
     }
 
     setTimelinePaneMountVersion((current) => current + 1);
+    lastObservedScrollHeightRef.current = node.scrollHeight;
 
     const savedPinned = lastTimelinePinnedBySessionRef.current.get(selectedSessionKey);
     const savedScrollTop = lastTimelineScrollTopBySessionRef.current.get(selectedSessionKey);
@@ -184,7 +225,8 @@ export function useTimelineController({
     const shouldRestoreBottom = (savedPinned ?? pinnedToBottomRef.current) || preserveBottomOnNextPaneResizeRef.current;
     if (shouldRestoreBottom) {
       preserveBottomOnNextPaneResizeRef.current = true;
-      node.scrollTop = node.scrollHeight;
+      node.scrollTop = Math.max(0, node.scrollHeight - node.clientHeight);
+      lastObservedScrollHeightRef.current = node.scrollHeight;
       window.requestAnimationFrame(() => {
         if (timelinePaneRef.current !== node) {
           return;
@@ -203,6 +245,7 @@ export function useTimelineController({
 
     node.scrollTop = savedScrollTop;
     pinnedToBottomRef.current = false;
+    lastObservedScrollHeightRef.current = node.scrollHeight;
     resetExactBottomRestoreState();
     lastTimelinePinnedBySessionRef.current.set(selectedSessionKey, false);
     window.requestAnimationFrame(() => {
@@ -254,6 +297,11 @@ export function useTimelineController({
     pinnedToBottomRef.current = true;
     previousTimelinePaneSizeRef.current = null;
     preserveBottomOnNextPaneResizeRef.current = false;
+    lastObservedScrollHeightRef.current = timelinePaneRef.current?.scrollHeight ?? 0;
+    if (pendingIncrementalBottomFrameRef.current != null) {
+      window.cancelAnimationFrame(pendingIncrementalBottomFrameRef.current);
+      pendingIncrementalBottomFrameRef.current = null;
+    }
     resetExactBottomRestoreState(selectedSessionKey || null);
     setDisableTimelineVirtualization(Boolean(selectedSessionKey));
   }, [resetExactBottomRestoreState, selectedSessionKey]);
@@ -363,12 +411,12 @@ export function useTimelineController({
     lastTranscriptMarkerRef.current = marker;
 
     if (pinnedToBottomRef.current) {
-      requestPinnedBottomAlignment("auto", { preferExactRestore: true });
+      requestIncrementalBottomAlignment();
       return;
     }
 
     setShowJumpToLatest(true);
-  }, [activeTranscript, requestPinnedBottomAlignment, selectedSession, selectedSessionKey]);
+  }, [activeTranscript, requestIncrementalBottomAlignment, selectedSession, selectedSessionKey]);
 
   const handleComposerHeightChange = useCallback(() => {
     const pane = timelinePaneRef.current;
@@ -401,9 +449,9 @@ export function useTimelineController({
       if (!pinnedToBottomRef.current && !preserveBottomOnNextPaneResizeRef.current) {
         return;
       }
-      requestPinnedBottomAlignment("auto", { preferExactRestore: true });
+      requestIncrementalBottomAlignment();
     });
-  }, [requestPinnedBottomAlignment]);
+  }, [requestIncrementalBottomAlignment]);
 
   const handleTimelineScroll = useCallback(() => {
     const pane = timelinePaneRef.current;
@@ -417,6 +465,7 @@ export function useTimelineController({
     }
 
     pinnedToBottomRef.current = pinned;
+    lastObservedScrollHeightRef.current = pane.scrollHeight;
     lastTimelineScrollTopBySessionRef.current.set(selectedSessionKey, pane.scrollTop);
     lastTimelinePinnedBySessionRef.current.set(selectedSessionKey, pinned);
     if (pinned) {

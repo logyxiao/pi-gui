@@ -478,6 +478,11 @@
   gap: 8px;
   width: 258px;
   padding: 10px;
+  pointer-events: none;
+}
+
+.composer__action-tooltip-wrap:hover .composer__context-tooltip,
+.composer__action-tooltip-wrap:focus-within .composer__context-tooltip {
   pointer-events: auto;
 }
 

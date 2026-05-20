@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "pnpm --filter @pi-gui/desktop dev",
     "build": "pnpm -r --if-present build",
-    "build:desktop:mac": "pnpm --filter @pi-gui/desktop package:mac",
+    "build:desktop:mac": "pnpm --filter @pi-gui/desktop package:mac && node scripts/open-latest-desktop-dmg-dir.mjs",
     "build:desktop:win": "pnpm --filter @pi-gui/desktop package:win",
     "build:desktop:linux": "pnpm --filter @pi-gui/desktop package:linux",
     "build:desktop:all": "pnpm --filter @pi-gui/desktop package:all",

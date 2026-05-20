@@ -50,6 +50,7 @@ import { NotificationManager } from "./notification-manager";
 import {
   NotificationPermissionService,
 } from "./notification-permission";
+import { hydrateProcessPathFromLoginShell } from "./shell-environment";
 import { checkForUpdate, initUpdateChecker } from "./update-checker";
 import { getThemeBackgroundColor, ThemeManager } from "./theme-manager";
 import { TerminalService } from "./terminal-service";
@@ -488,6 +489,7 @@ app.whenReady().then(async () => {
   if (!hasSingleInstanceLock) {
     return;
   }
+  await hydrateProcessPathFromLoginShell();
   languageMode = await resolveInitialLanguageMode();
   setMainLanguage(languageMode);
 
