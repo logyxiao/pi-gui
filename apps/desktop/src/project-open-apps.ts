@@ -1,10 +1,40 @@
 export const PROJECT_OPEN_APPS = [
-  { id: "vscode", label: "VS Code", macAppName: "Visual Studio Code" },
-  { id: "cursor", label: "Cursor", macAppName: "Cursor" },
-  { id: "finder", label: "Finder", macAppName: "Finder" },
-  { id: "terminal", label: "Terminal", macAppName: "Terminal" },
-  { id: "ghostty", label: "Ghostty", macAppName: "Ghostty" },
-  { id: "xcode", label: "Xcode", macAppName: "Xcode" },
+  {
+    id: "vscode",
+    label: "VS Code",
+    macAppName: "Visual Studio Code",
+    macAppPaths: ["/Applications/Visual Studio Code.app"],
+  },
+  {
+    id: "cursor",
+    label: "Cursor",
+    macAppName: "Cursor",
+    macAppPaths: ["/Applications/Cursor.app"],
+  },
+  {
+    id: "finder",
+    label: "Finder",
+    macAppName: "Finder",
+    macAppPaths: ["/System/Library/CoreServices/Finder.app"],
+  },
+  {
+    id: "terminal",
+    label: "Terminal",
+    macAppName: "Terminal",
+    macAppPaths: ["/System/Applications/Utilities/Terminal.app", "/Applications/Utilities/Terminal.app"],
+  },
+  {
+    id: "ghostty",
+    label: "Ghostty",
+    macAppName: "Ghostty",
+    macAppPaths: ["/Applications/Ghostty.app"],
+  },
+  {
+    id: "xcode",
+    label: "Xcode",
+    macAppName: "Xcode",
+    macAppPaths: ["/Applications/Xcode.app"],
+  },
 ] as const;
 
 export type ProjectOpenAppId = (typeof PROJECT_OPEN_APPS)[number]["id"];

@@ -60,6 +60,7 @@ function TopbarComponent(props: TopbarProps) {
   const [projectRunError, setProjectRunError] = useState("");
   const [projectOpenMenuOpen, setProjectOpenMenuOpen] = useState(false);
   const [projectOpenError, setProjectOpenError] = useState("");
+  const [projectOpenAppIcons, setProjectOpenAppIcons] = useState<Partial<Record<ProjectOpenAppId, string>>>({});
   const selectedProjectOpenApp = getProjectOpenApp(lastProjectOpenApp);
   const projectOpenDisabled = !selectedWorkspace;
   const projectRunDisabled = !selectedWorkspace || !selectedSession;
@@ -71,6 +72,36 @@ function TopbarComponent(props: TopbarProps) {
   useEffect(() => {
     setProjectCommandDraft(projectStartCommand);
   }, [projectStartCommand, selectedWorkspace?.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.all(
+      PROJECT_OPEN_APPS.map(async (app) => {
+        try {
+          const iconUrl = await api.getProjectOpenAppIcon(app.id);
+          return [app.id, iconUrl] as const;
+        } catch {
+          return [app.id, null] as const;
+        }
+      }),
+    ).then((entries) => {
+      if (cancelled) {
+        return;
+      }
+
+      const nextIcons: Partial<Record<ProjectOpenAppId, string>> = {};
+      for (const [appId, iconUrl] of entries) {
+        if (iconUrl) {
+          nextIcons[appId] = iconUrl;
+        }
+      }
+      setProjectOpenAppIcons(nextIcons);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [api]);
 
   useEffect(() => {
     if (!projectOpenMenuOpen && !projectRunMenuOpen) {
@@ -296,7 +327,7 @@ function TopbarComponent(props: TopbarProps) {
               type="button"
               onClick={() => void openSelectedWorkspaceInApp(selectedProjectOpenApp.id)}
             >
-              <ProjectOpenAppIcon appId={selectedProjectOpenApp.id} />
+              <ProjectOpenAppIcon appId={selectedProjectOpenApp.id} iconUrl={projectOpenAppIcons[selectedProjectOpenApp.id]} />
             </button>
             <button
               aria-expanded={projectOpenMenuOpen}
@@ -324,7 +355,7 @@ function TopbarComponent(props: TopbarProps) {
                   type="button"
                   onClick={() => void openSelectedWorkspaceInApp(app.id)}
                 >
-                  <ProjectOpenAppIcon appId={app.id} />
+                  <ProjectOpenAppIcon appId={app.id} iconUrl={projectOpenAppIcons[app.id]} />
                   <span>{app.label}</span>
                 </button>
               ))}
@@ -367,7 +398,15 @@ function TopbarComponent(props: TopbarProps) {
 
 export const Topbar = memo(TopbarComponent);
 
-function ProjectOpenAppIcon({ appId }: { readonly appId: ProjectOpenAppId }) {
+function ProjectOpenAppIcon({ appId, iconUrl }: { readonly appId: ProjectOpenAppId; readonly iconUrl?: string }) {
+  if (iconUrl) {
+    return (
+      <span className={`project-action__app-icon project-action__app-icon--native project-action__app-icon--${appId}`} aria-hidden="true">
+        <img src={iconUrl} alt="" />
+      </span>
+    );
+  }
+
   const label = appId === "vscode"
     ? "V"
     : appId === "cursor"

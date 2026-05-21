@@ -94,6 +94,8 @@ contextBridge.exposeInMainWorld("piApp", {
     ipcRenderer.invoke(desktopIpc.openWorkspaceInFinder, workspaceId) as Promise<void>,
   openWorkspaceInApp: (workspaceId: string, appId: ProjectOpenAppId) =>
     ipcRenderer.invoke(desktopIpc.openWorkspaceInApp, workspaceId, appId) as Promise<DesktopAppState>,
+  getProjectOpenAppIcon: (appId: ProjectOpenAppId) =>
+    ipcRenderer.invoke(desktopIpc.getProjectOpenAppIcon, appId) as Promise<string | null>,
   setProjectStartCommand: (workspaceId: string, command: string) =>
     ipcRenderer.invoke(desktopIpc.setProjectStartCommand, workspaceId, command) as Promise<DesktopAppState>,
   createWorktree: (input: CreateWorktreeInput) =>

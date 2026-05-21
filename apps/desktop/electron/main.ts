@@ -25,7 +25,8 @@ import {
 } from "electron";
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
@@ -137,6 +138,135 @@ async function openWorkspacePathInApp(workspacePath: string, appId: ProjectOpenA
 
   const appRecord = getProjectOpenApp(appId);
   await execFileAsync("open", ["-a", appRecord.macAppName, workspacePath]);
+}
+
+const projectOpenAppIconCache = new Map<ProjectOpenAppId, string | null>();
+
+async function getProjectOpenAppIconDataUrl(appId: ProjectOpenAppId): Promise<string | null> {
+  if (projectOpenAppIconCache.has(appId)) {
+    return projectOpenAppIconCache.get(appId) ?? null;
+  }
+
+  const appPath = await resolveProjectOpenAppPath(appId);
+  if (!appPath) {
+    projectOpenAppIconCache.set(appId, null);
+    return null;
+  }
+
+  const bundleIconDataUrl = await readProjectOpenAppBundleIconDataUrl(appPath);
+  if (bundleIconDataUrl) {
+    projectOpenAppIconCache.set(appId, bundleIconDataUrl);
+    return bundleIconDataUrl;
+  }
+
+  try {
+    const image = await app.getFileIcon(appPath, { size: "normal" });
+    const dataUrl = nativeImageToDataUrl(image);
+    projectOpenAppIconCache.set(appId, dataUrl);
+    return dataUrl;
+  } catch {
+    projectOpenAppIconCache.set(appId, null);
+    return null;
+  }
+}
+
+async function resolveProjectOpenAppPath(appId: ProjectOpenAppId): Promise<string | undefined> {
+  const appRecord = getProjectOpenApp(appId);
+  for (const candidatePath of expandProjectOpenAppPaths(appRecord.macAppPaths)) {
+    try {
+      const candidateStat = await stat(candidatePath);
+      if (candidateStat.isDirectory()) {
+        return candidatePath;
+      }
+    } catch {
+      // Try the next common install location.
+    }
+  }
+
+  return undefined;
+}
+
+async function readProjectOpenAppBundleIconDataUrl(appPath: string): Promise<string | null> {
+  const iconPath = await resolveBundleIconPath(appPath);
+  if (!iconPath) {
+    return null;
+  }
+
+  const pngDataUrl = await convertIconFileToPngDataUrl(iconPath);
+  if (pngDataUrl) {
+    return pngDataUrl;
+  }
+
+  const image = nativeImage.createFromPath(iconPath);
+  return nativeImageToDataUrl(image);
+}
+
+async function convertIconFileToPngDataUrl(iconPath: string): Promise<string | null> {
+  const tempDir = await mkdtemp(path.join(tmpdir(), "pi-gui-app-icon-"));
+  const pngPath = path.join(tempDir, "icon.png");
+  try {
+    await execFileAsync("sips", ["-Z", "64", "-s", "format", "png", iconPath, "--out", pngPath]);
+    const png = await readFile(pngPath);
+    return png.byteLength > 0 ? `data:image/png;base64,${png.toString("base64")}` : null;
+  } catch {
+    return null;
+  } finally {
+    await rm(tempDir, { force: true, recursive: true }).catch(() => undefined);
+  }
+}
+
+async function resolveBundleIconPath(appPath: string): Promise<string | undefined> {
+  const infoPlistPath = path.join(appPath, "Contents", "Info.plist");
+  const rawIconName =
+    await readPlistRawValue(infoPlistPath, "CFBundleIconFile") ??
+    await readPlistRawValue(infoPlistPath, "CFBundleIconName");
+  const iconName = rawIconName?.trim();
+  if (!iconName) {
+    return undefined;
+  }
+
+  const resourcePath = path.join(
+    appPath,
+    "Contents",
+    "Resources",
+    path.extname(iconName) ? iconName : `${iconName}.icns`,
+  );
+  try {
+    const resourceStat = await stat(resourcePath);
+    return resourceStat.isFile() ? resourcePath : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function readPlistRawValue(plistPath: string, key: string): Promise<string | undefined> {
+  try {
+    const { stdout } = await execFileAsync("plutil", ["-extract", key, "raw", "-o", "-", plistPath]);
+    const value = stdout.trim();
+    return value || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function nativeImageToDataUrl(image: Electron.NativeImage): string | null {
+  if (image.isEmpty()) {
+    return null;
+  }
+
+  const resized = image.resize({ width: 32, height: 32, quality: "best" });
+  return (resized.isEmpty() ? image : resized).toDataURL();
+}
+
+function expandProjectOpenAppPaths(paths: readonly string[]): readonly string[] {
+  const expanded = new Set<string>();
+  for (const appPath of paths) {
+    expanded.add(appPath);
+    if (appPath.startsWith("/Applications/")) {
+      expanded.add(path.join(homedir(), appPath.slice(1)));
+    }
+  }
+  return [...expanded];
 }
 
 function getTerminalService(): TerminalService {
@@ -631,6 +761,12 @@ app.whenReady().then(async () => {
     await openWorkspacePathInApp(workspacePath, appIdInput);
     return store.setLastProjectOpenApp(appIdInput);
   });
+  registerRendererIpc(desktopIpc.getProjectOpenAppIcon, (_event, appIdInput: unknown) => {
+    if (!isProjectOpenAppId(appIdInput)) {
+      throw new Error("Invalid project open app");
+    }
+    return getProjectOpenAppIconDataUrl(appIdInput);
+  });
   registerRendererIpc(desktopIpc.setProjectStartCommand, (_event, workspaceId: string, command: string) =>
     store.setProjectStartCommand(
       assertWorkspaceId(workspaceId),
@@ -961,20 +1097,7 @@ app.whenReady().then(async () => {
 });
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    stopNotifications?.();
-    stopNotifications = undefined;
-    notificationManager = undefined;
-    notificationPermissionService?.dispose();
-    notificationPermissionService = undefined;
-    stopUpdateChecker?.();
-    stopUpdateChecker = undefined;
-    stopPruningTerminals?.();
-    stopPruningTerminals = undefined;
-    terminalService?.dispose();
-    terminalService = undefined;
-    app.quit();
-  }
+  app.quit();
 });
 
 app.on("before-quit", (event) => {
