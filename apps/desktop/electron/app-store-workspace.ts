@@ -1,7 +1,9 @@
 import { sessionKey } from "@pi-gui/pi-sdk-driver";
+import type { WorkspaceRef } from "@pi-gui/session-driver";
 import type { CreateSessionInput, DesktopAppState, WorkspaceSessionTarget } from "../src/desktop-state";
 import { toSessionRef } from "./app-store-utils";
 import type { AppStoreInternals, RefreshStateOptions } from "./app-store-internals";
+import { serializeStoreRequest } from "./app-store-request-locks";
 import { NEW_THREAD_PLACEHOLDER_TITLE } from "./thread-title-constants";
 
 function fallbackSelectionAfterWorkspaceRemoval(
@@ -212,6 +214,24 @@ export async function createSession(store: AppStoreInternals, input: CreateSessi
     return store.withError(`Unknown workspace: ${input.workspaceId}`);
   }
 
+  return serializeStoreRequest(store, createSessionRequestKey(input), () =>
+    createSessionUnlocked(store, input, ws),
+  );
+}
+
+function createSessionRequestKey(input: CreateSessionInput): string {
+  return JSON.stringify({
+    kind: "create-session",
+    workspaceId: input.workspaceId,
+    title: input.title?.trim() ?? "",
+  });
+}
+
+async function createSessionUnlocked(
+  store: AppStoreInternals,
+  input: CreateSessionInput,
+  ws: WorkspaceRef,
+): Promise<DesktopAppState> {
   return store.withErrorHandling(async () => {
     const createOptions = await store.buildCreateSessionOptions(input.workspaceId);
     const snapshot = await store.driver.createSession(ws, {

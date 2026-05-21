@@ -20,6 +20,7 @@ import {
   toTranscriptAttachments,
 } from "./app-store-utils";
 import type { AppStoreInternals } from "./app-store-internals";
+import { serializeStoreRequest } from "./app-store-request-locks";
 
 /* ── Public methods ─────────────────────────────────────── */
 
@@ -277,6 +278,34 @@ export async function submitComposer(
     return store.withError("Create or select a session before sending a message.");
   }
 
+  return serializeStoreRequest(store, submitComposerRequestKey(sessionRef, text, options), () =>
+    submitComposerUnlocked(store, sessionRef, textInput, text, attachments, options),
+  );
+}
+
+function submitComposerRequestKey(
+  sessionRef: SessionRef,
+  text: string,
+  options: { readonly deliverAs?: "steer" | "followUp" },
+): string {
+  return JSON.stringify({
+    kind: "submit-composer",
+    session: sessionKey(sessionRef),
+    text,
+    deliverAs: options.deliverAs,
+  });
+}
+
+async function submitComposerUnlocked(
+  store: AppStoreInternals,
+  sessionRef: SessionRef,
+  textInput: string,
+  text: string,
+  attachments: readonly ComposerAttachment[],
+  options: {
+    readonly deliverAs?: "steer" | "followUp";
+  },
+): Promise<DesktopAppState> {
   const runtime = store.runtimeByWorkspace.get(sessionRef.workspaceId);
   const sessionCommands = store.sessionState.sessionCommandsBySession.get(sessionKey(sessionRef)) ?? [];
   const runtimeSlashCommand = hasRuntimeSlashCommand(text, runtime, sessionCommands);

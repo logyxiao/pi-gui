@@ -107,6 +107,8 @@ export default function App({
   const [newThreadModelId, setNewThreadModelId] = useState<string | undefined>();
   const [newThreadThinkingLevel, setNewThreadThinkingLevel] = useState<string | undefined>();
   const [newThreadComposerError, setNewThreadComposerError] = useState<string | undefined>();
+  const [pendingComposerSubmitKeys, setPendingComposerSubmitKeys] = useState<readonly string[]>([]);
+  const [newThreadSubmitting, setNewThreadSubmitting] = useState(false);
   const { mode: themeMode, setMode: setThemeMode } = useThemeMode();
   const [dockExpandedBySession, setDockExpandedBySession] = useState<Record<string, boolean>>({});
   const [treeModalState, setTreeModalState] = useState<{
@@ -122,6 +124,8 @@ export default function App({
   });
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const newThreadComposerRef = useRef<HTMLTextAreaElement | null>(null);
+  const pendingComposerSubmitKeysRef = useRef<Set<string>>(new Set());
+  const newThreadSubmittingRef = useRef(false);
   const previousActiveViewRef = useRef<AppView | null>(null);
   const [showDiffPanel, setShowDiffPanel] = useState(false);
   const [diffPanelWidth, setDiffPanelWidth] = useState(loadDiffPanelWidth);
@@ -249,6 +253,7 @@ export default function App({
   const editingQueuedMessageId = snapshot?.editingQueuedMessageId;
   const runningLabel = useRunningLabel(selectedSession?.status === "running" ? selectedSession.runningSince : undefined);
   const selectedSessionKey = selectedWorkspace && selectedSession ? `${selectedWorkspace.id}:${selectedSession.id}` : "";
+  const selectedComposerSubmitting = Boolean(selectedSessionKey) && pendingComposerSubmitKeys.includes(selectedSessionKey);
   const activeTranscript =
     selectedTranscript &&
     selectedWorkspace &&
@@ -812,6 +817,10 @@ export default function App({
     if (!selectedSession) {
       return;
     }
+    const submitKey = selectedSessionKey;
+    if (!submitKey || pendingComposerSubmitKeysRef.current.has(submitKey)) {
+      return;
+    }
 
     const hasComposerInput = composerDraft.trim().length > 0 || composerAttachments.length > 0;
     if (selectedSession.status === "running" && !hasComposerInput) {
@@ -844,6 +853,8 @@ export default function App({
     }
 
     const previousDraft = composerDraft;
+    pendingComposerSubmitKeysRef.current.add(submitKey);
+    setPendingComposerSubmitKeys([...pendingComposerSubmitKeysRef.current]);
     setComposerDraft("");
     setAttachmentsClearedOnSubmit(true);
     void (async () => {
@@ -855,6 +866,9 @@ export default function App({
     })().catch(() => {
       setComposerDraft(previousDraft);
       setAttachmentsClearedOnSubmit(false);
+    }).finally(() => {
+      pendingComposerSubmitKeysRef.current.delete(submitKey);
+      setPendingComposerSubmitKeys([...pendingComposerSubmitKeysRef.current]);
     });
   };
 
@@ -1140,6 +1154,9 @@ export default function App({
   };
 
   const handleStartThread = () => {
+    if (newThreadSubmittingRef.current) {
+      return;
+    }
     if (!newThreadRootWorkspaceId || (!newThreadPrompt.trim() && newThreadAttachments.length === 0)) {
       return;
     }
@@ -1167,6 +1184,8 @@ export default function App({
       environment: newThreadEnvironment,
       ...modelConfig,
     };
+    newThreadSubmittingRef.current = true;
+    setNewThreadSubmitting(true);
     wsMenu.expandWorkspace(newThreadRootWorkspaceId);
     void updateSnapshot(api, setSnapshot, () =>
       api.startThread(input),
@@ -1177,6 +1196,9 @@ export default function App({
       setNewThreadModelId(undefined);
       setNewThreadThinkingLevel(undefined);
       setNewThreadEnvironment("local");
+    }).finally(() => {
+      newThreadSubmittingRef.current = false;
+      setNewThreadSubmitting(false);
     });
   };
 
@@ -1411,6 +1433,7 @@ export default function App({
               onSelectMention={newThreadMentionMenu.insertMention}
               onAddAttachments={handleNewThreadAddAttachments}
               onRemoveAttachment={handleNewThreadRemoveAttachment}
+              submitting={newThreadSubmitting}
               onSubmit={handleStartThread}
             />
           ) : (
@@ -1499,6 +1522,7 @@ export default function App({
               extensionDock: selectedExtensionDock,
               extensionDockExpanded: isSelectedExtensionDockExpanded,
               onToggleExtensionDock: handleToggleExtensionDock,
+              submitting: selectedComposerSubmitting,
             }}
             treeModal={{
               open: treeModalState.open,

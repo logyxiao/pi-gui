@@ -2,6 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { AppView, SelectedTranscriptRecord, SessionRecord } from "../desktop-state";
 import { VIRTUALIZATION_THRESHOLD } from "../conversation-timeline";
 
+const BOTTOM_ALIGNMENT_EPSILON_PX = 1;
+
 interface TimelineControllerOptions {
   readonly activeTranscript: SelectedTranscriptRecord["transcript"];
   readonly activeView: AppView | undefined;
@@ -41,6 +43,10 @@ export function useTimelineController({
   const pendingPinnedBottomBehaviorRef = useRef<ScrollBehavior>("auto");
   const pendingIncrementalBottomFrameRef = useRef<number | null>(null);
   const lastObservedScrollHeightRef = useRef(0);
+  const previousSessionStatusRef = useRef<{
+    readonly key: string;
+    readonly status: SessionRecord["status"] | undefined;
+  }>({ key: "", status: undefined });
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const [timelinePaneMountVersion, setTimelinePaneMountVersion] = useState(0);
   const [disableTimelineVirtualization, setDisableTimelineVirtualization] = useState(true);
@@ -65,7 +71,7 @@ export function useTimelineController({
     const align = (remainingChecks: number) => {
       const targetScrollTop = Math.max(0, pane.scrollHeight - pane.clientHeight);
       if (behavior === "auto") {
-        pane.scrollTop = targetScrollTop;
+        setPaneScrollTop(pane, targetScrollTop);
       } else {
         pane.scrollTo({ top: targetScrollTop, behavior });
       }
@@ -80,14 +86,14 @@ export function useTimelineController({
       }
 
       window.requestAnimationFrame(() => {
-        const remaining = pane.scrollHeight - pane.scrollTop - pane.clientHeight;
-        if (remaining > 1 || remainingChecks > 1) {
+        const remaining = getBottomRemaining(pane);
+        if (remaining > BOTTOM_ALIGNMENT_EPSILON_PX) {
           align(remainingChecks - 1);
         }
       });
     };
 
-    align(6);
+    align(behavior === "auto" ? 6 : 0);
   }, [selectedSessionKey]);
 
   const requestIncrementalBottomAlignment = useCallback(() => {
@@ -108,9 +114,9 @@ export function useTimelineController({
       const targetScrollTop = Math.max(0, nextScrollHeight - pane.clientHeight);
 
       if (heightDelta > 0 && pane.scrollTop < targetScrollTop) {
-        pane.scrollTop = Math.min(targetScrollTop, pane.scrollTop + heightDelta);
+        setPaneScrollTop(pane, Math.min(targetScrollTop, pane.scrollTop + heightDelta));
       } else {
-        pane.scrollTop = targetScrollTop;
+        setPaneScrollTop(pane, targetScrollTop);
       }
 
       pinnedToBottomRef.current = true;
@@ -343,6 +349,38 @@ export function useTimelineController({
   }, [activeView, selectedSession, selectedSessionKey]);
 
   useLayoutEffect(() => {
+    const previous = previousSessionStatusRef.current;
+    const nextStatus = selectedSession?.status;
+    previousSessionStatusRef.current = { key: selectedSessionKey, status: nextStatus };
+
+    if (previous.key !== selectedSessionKey || previous.status !== "running" || nextStatus === "running") {
+      return;
+    }
+
+    if (pendingIncrementalBottomFrameRef.current != null) {
+      window.cancelAnimationFrame(pendingIncrementalBottomFrameRef.current);
+      pendingIncrementalBottomFrameRef.current = null;
+    }
+
+    if (!pinnedToBottomRef.current && !preserveBottomOnNextPaneResizeRef.current) {
+      preserveBottomOnNextPaneResizeRef.current = false;
+      return;
+    }
+
+    requestIncrementalBottomAlignment();
+    window.requestAnimationFrame(() => {
+      preserveBottomOnNextPaneResizeRef.current = false;
+      const pane = timelinePaneRef.current;
+      if (!pane) {
+        return;
+      }
+      lastObservedScrollHeightRef.current = pane.scrollHeight;
+      lastTimelinePinnedBySessionRef.current.set(selectedSessionKey, isNearBottom(pane));
+      lastTimelineScrollTopBySessionRef.current.set(selectedSessionKey, pane.scrollTop);
+    });
+  }, [requestIncrementalBottomAlignment, selectedSession?.status, selectedSessionKey]);
+
+  useLayoutEffect(() => {
     const pane = timelinePaneRef.current;
     if (!pane || !selectedSession || activeView !== "threads") {
       previousTimelinePaneSizeRef.current = null;
@@ -512,6 +550,16 @@ function buildTranscriptChangeMarker(sessionKey: string, transcript: SelectedTra
 }
 
 function isNearBottom(element: HTMLDivElement): boolean {
-  const remaining = element.scrollHeight - element.scrollTop - element.clientHeight;
-  return remaining < 32;
+  return getBottomRemaining(element) < 32;
+}
+
+function getBottomRemaining(element: HTMLDivElement): number {
+  return Math.max(0, element.scrollHeight - element.scrollTop - element.clientHeight);
+}
+
+function setPaneScrollTop(element: HTMLDivElement, scrollTop: number): void {
+  if (Math.abs(element.scrollTop - scrollTop) <= BOTTOM_ALIGNMENT_EPSILON_PX) {
+    return;
+  }
+  element.scrollTop = scrollTop;
 }

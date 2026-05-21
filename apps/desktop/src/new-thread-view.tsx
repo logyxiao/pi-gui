@@ -57,6 +57,7 @@ interface NewThreadViewProps {
   readonly onSelectMention: (filePath: string) => void;
   readonly onAddAttachments: (files: File[]) => void;
   readonly onRemoveAttachment: (attachmentId: string) => void;
+  readonly submitting: boolean;
   readonly onSubmit: () => void;
 }
 
@@ -100,6 +101,7 @@ export function NewThreadView({
   onSelectMention,
   onAddAttachments,
   onRemoveAttachment,
+  submitting,
   onSubmit,
 }: NewThreadViewProps) {
   const { t } = useI18n();
@@ -208,6 +210,7 @@ export function NewThreadView({
                   onSetModel={onSetModel}
                   onSetThinking={onSetThinking}
                   onAddAttachments={onAddAttachments}
+                  submitting={submitting}
                   onSubmit={onSubmit}
                 />
               )}
@@ -232,6 +235,7 @@ interface NewThreadComposerFooterProps {
   readonly onSetModel: (provider: string, modelId: string) => void;
   readonly onSetThinking: (level: string) => void;
   readonly onAddAttachments: (files: File[]) => void;
+  readonly submitting: boolean;
   readonly onSubmit: () => void;
 }
 
@@ -248,6 +252,7 @@ function NewThreadComposerFooter({
   onSetModel,
   onSetThinking,
   onAddAttachments,
+  submitting,
   onSubmit,
 }: NewThreadComposerFooterProps) {
   const { t } = useI18n();
@@ -315,7 +320,7 @@ function NewThreadComposerFooter({
               aria-label={t("newThread.startThread")}
               className="button button--primary button--cta-icon"
               type="button"
-              disabled={!hasContent || modelOnboarding.requiresModelSelection}
+              disabled={submitting || !hasContent || modelOnboarding.requiresModelSelection}
               onClick={onSubmit}
             >
               <ArrowUpIcon />

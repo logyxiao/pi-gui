@@ -65,6 +65,7 @@ export interface ComposerPanelProps {
   readonly extensionDock?: ExtensionDockModel;
   readonly extensionDockExpanded: boolean;
   readonly onToggleExtensionDock: () => void;
+  readonly submitting: boolean;
 }
 
 function ComposerPanelComponent({
@@ -115,6 +116,7 @@ function ComposerPanelComponent({
   extensionDock,
   extensionDockExpanded,
   onToggleExtensionDock,
+  submitting,
 }: ComposerPanelProps) {
   const { t } = useI18n();
   const hasComposerInput = composerDraft.trim().length > 0 || attachments.length > 0;
@@ -340,7 +342,7 @@ function ComposerPanelComponent({
                       type="button"
                       disabled={
                         !primaryActionIsStop &&
-                        ((!composerDraft.trim() && attachments.length === 0) || modelOnboarding.requiresModelSelection)
+                        (submitting || (!composerDraft.trim() && attachments.length === 0) || modelOnboarding.requiresModelSelection)
                       }
                       onClick={onSubmit}
                     >

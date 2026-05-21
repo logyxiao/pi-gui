@@ -1,4 +1,4 @@
-import { Notification, type BrowserWindow } from "electron";
+import { app, Notification, type BrowserWindow } from "electron";
 import { appendFile, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { DesktopAppStore } from "./app-store";
@@ -19,6 +19,7 @@ export class NotificationManager {
   private lastActivelyViewedSession: SessionRef | undefined;
   private backgroundCandidateSessions: SessionRef[] = [];
   private permissionRequestPending = false;
+  private dockBadgeCount = 0;
 
   constructor(
     private readonly store: DesktopAppStore,
@@ -29,6 +30,7 @@ export class NotificationManager {
   start(): () => void {
     const stopState = this.store.subscribe((state) => {
       this.latestState = state;
+      this.syncDockBadge(state);
       const selectedSession = getSelectedSession(state);
       const window = this.getWindow();
       if (
@@ -51,6 +53,7 @@ export class NotificationManager {
     });
     const stopEvents = this.store.subscribeToSessionEvents((event, state) => {
       this.latestState = state;
+      this.syncDockBadge(state);
       void this.reevaluateOnboardingState();
       void this.handleEvent(event);
     });
@@ -58,6 +61,7 @@ export class NotificationManager {
       stopState();
       stopEvents();
       this.trackWindow(null);
+      this.clearDockBadge();
     };
   }
 
@@ -336,6 +340,40 @@ export class NotificationManager {
   private titleForSession(sessionRef: SessionRef): string {
     return this.sessionFromLatestState(sessionRef)?.title ?? tMain("main.notification.sessionFallback");
   }
+
+  private syncDockBadge(state: DesktopAppState): void {
+    if (process.platform !== "darwin") {
+      return;
+    }
+
+    const count = countUnseenSessions(state);
+    if (count === this.dockBadgeCount) {
+      return;
+    }
+
+    this.dockBadgeCount = count;
+    app.dock?.setBadge(count > 0 ? String(count) : "");
+  }
+
+  private clearDockBadge(): void {
+    if (process.platform !== "darwin") {
+      return;
+    }
+    this.dockBadgeCount = 0;
+    app.dock?.setBadge("");
+  }
+}
+
+function countUnseenSessions(state: DesktopAppState): number {
+  let count = 0;
+  for (const workspace of state.workspaces) {
+    for (const session of workspace.sessions) {
+      if (session.hasUnseenUpdate) {
+        count += 1;
+      }
+    }
+  }
+  return count;
 }
 
 function requiresAttention(event: Extract<SessionDriverEvent, { type: "hostUiRequest" }>): boolean {

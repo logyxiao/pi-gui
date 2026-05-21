@@ -52,6 +52,9 @@ interface SidebarProps {
 export function SidebarTopControls({
   activeView,
   selectedWorkspace,
+  api,
+  setSnapshot,
+  updateSnapshot,
   sidebarCollapsed,
   sidebarToggleVisible,
   sidebarToggleShortcutLabel,
@@ -61,6 +64,9 @@ export function SidebarTopControls({
 }: Pick<SidebarProps,
   | "activeView"
   | "selectedWorkspace"
+  | "api"
+  | "setSnapshot"
+  | "updateSnapshot"
   | "sidebarCollapsed"
   | "sidebarToggleVisible"
   | "sidebarToggleShortcutLabel"
@@ -82,6 +88,17 @@ export function SidebarTopControls({
           onClick={onNewThread}
         >
           <PlusIcon />
+        </button>
+        <button
+          aria-label={t("sidebar.openFolder")}
+          className="icon-button sidebar__command-icon"
+          type="button"
+          title={t("sidebar.openFolder")}
+          onClick={() => {
+            void updateSnapshot(api, setSnapshot, () => api.pickWorkspace());
+          }}
+        >
+          <FolderIcon />
         </button>
         <button
           aria-label={t("sidebar.settings")}
@@ -193,6 +210,9 @@ function SidebarComponent(props: SidebarProps) {
       <SidebarTopControls
         activeView={activeView}
         selectedWorkspace={selectedWorkspace}
+        api={api}
+        setSnapshot={setSnapshot}
+        updateSnapshot={updateSnapshot}
         sidebarCollapsed={sidebarCollapsed}
         sidebarToggleVisible={sidebarToggleVisible}
         sidebarToggleShortcutLabel={sidebarToggleShortcutLabel}
@@ -202,22 +222,6 @@ function SidebarComponent(props: SidebarProps) {
       />
 
       <div className="sidebar__section">
-        <div className="section__head">
-          <span>{t("sidebar.threads")}</span>
-          <div className="section__tools">
-            <button
-              aria-label={t("sidebar.openFolder")}
-              className="icon-button"
-              type="button"
-              onClick={() => {
-                void updateSnapshot(api, setSnapshot, () => api.pickWorkspace());
-              }}
-            >
-              <FolderIcon />
-            </button>
-          </div>
-        </div>
-
         {visibleWorkspaces.length === 0 ? (
           <div className="empty-state" data-testid="empty-state">
             <h2>{t("sidebar.noFoldersTitle")}</h2>

@@ -8,6 +8,7 @@ import type { CreateWorktreeInput, DesktopAppState, RemoveWorktreeInput, StartTh
 import { sendMessageToSession } from "./app-store-composer";
 import type { CreateWorktreeOptions } from "./worktree-manager";
 import type { AppStoreInternals } from "./app-store-internals";
+import { serializeStoreRequest } from "./app-store-request-locks";
 import { NEW_THREAD_PLACEHOLDER_TITLE } from "./thread-title-constants";
 
 /* ── Public methods ─────────────────────────────────────── */
@@ -80,6 +81,29 @@ export async function startThread(store: AppStoreInternals, input: StartThreadIn
     return store.withError(`Unknown workspace: ${input.rootWorkspaceId}`);
   }
 
+  return serializeStoreRequest(store, startThreadRequestKey(input), () =>
+    startThreadUnlocked(store, input, rootWorkspace),
+  );
+}
+
+function startThreadRequestKey(input: StartThreadInput): string {
+  return JSON.stringify({
+    kind: "start-thread",
+    rootWorkspaceId: input.rootWorkspaceId,
+    environment: input.environment,
+    prompt: input.prompt?.trim() ?? "",
+    provider: input.provider,
+    modelId: input.modelId,
+    thinkingLevel: input.thinkingLevel,
+    attachments: (input.attachments ?? []).map((attachment) => attachment.id),
+  });
+}
+
+async function startThreadUnlocked(
+  store: AppStoreInternals,
+  input: StartThreadInput,
+  rootWorkspace: WorkspaceRef,
+): Promise<DesktopAppState> {
   return store.withErrorHandling(async () => {
     let targetWorkspace = rootWorkspace;
     if (input.environment === "worktree") {
