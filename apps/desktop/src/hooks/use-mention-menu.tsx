@@ -38,17 +38,14 @@ export function useMentionMenu({
   api,
 }: UseMentionMenuParams): MentionMenuState {
   const [allFiles, setAllFiles] = useState<readonly string[]>([]);
+  const [loadedWorkspaceId, setLoadedWorkspaceId] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [suppressed, setSuppressed] = useState(false);
 
-  // Fetch file list when workspace changes
   useEffect(() => {
-    if (!api || !workspaceId) {
-      setAllFiles([]);
-      return;
-    }
-    void api.listWorkspaceFiles(workspaceId).then(setAllFiles).catch(() => setAllFiles([]));
-  }, [api, workspaceId]);
+    setAllFiles([]);
+    setLoadedWorkspaceId("");
+  }, [workspaceId]);
 
   // Reset suppression when draft changes
   useEffect(() => {
@@ -62,6 +59,32 @@ export function useMentionMenu({
     }
     return extractMentionQuery(composerDraft);
   }, [composerDraft, suppressed]);
+
+  // Defer the git-backed file scan until the user actually opens @ mention.
+  useEffect(() => {
+    if (!api || !workspaceId || !mentionMatch || loadedWorkspaceId === workspaceId) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    void api.listWorkspaceFiles(workspaceId).then((files) => {
+      if (cancelled) {
+        return;
+      }
+      setAllFiles(files);
+      setLoadedWorkspaceId(workspaceId);
+    }).catch(() => {
+      if (cancelled) {
+        return;
+      }
+      setAllFiles([]);
+      setLoadedWorkspaceId(workspaceId);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [api, loadedWorkspaceId, mentionMatch, workspaceId]);
 
   const mentionOptions = useMemo(() => {
     if (!mentionMatch) {

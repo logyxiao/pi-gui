@@ -13,12 +13,20 @@ export async function hydrateProcessPathFromLoginShell(): Promise<void> {
   }
 
   const currentPath = process.env.PATH ?? "";
-  const loginShellPath = await readLoginShellPath().catch(() => "");
   const fallbackPaths = buildFallbackPathEntries();
+  const fallbackMergedPath = mergePathEntries([
+    ...currentPath.split(delimiter),
+    ...fallbackPaths,
+  ]);
+  if (fallbackMergedPath) {
+    process.env.PATH = fallbackMergedPath;
+  }
+
+  const loginShellPath = await readLoginShellPath().catch(() => "");
   const shellPathEntries = loginShellPath.split(delimiter).filter(Boolean);
   const mergedPath = mergePathEntries([
     ...shellPathEntries,
-    ...currentPath.split(delimiter),
+    ...(process.env.PATH ?? "").split(delimiter),
     ...fallbackPaths,
   ]);
 
@@ -45,7 +53,7 @@ async function readPathFromShell(shellPath: string): Promise<string> {
     ["-lic", `printf '${PATH_MARKER_START}%s${PATH_MARKER_END}\\n' "$PATH"`],
     {
       encoding: "utf8",
-      timeout: 5_000,
+      timeout: 1_500,
       windowsHide: true,
     },
   );

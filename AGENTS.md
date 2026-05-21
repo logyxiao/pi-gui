@@ -7,7 +7,6 @@ These rules apply for the full session.
 - For non-trivial work, plan verification up front with the `self-test` skill.
 - Do not create or switch to new branches to start work unless the user explicitly asks; respect the current branch or worktree as intentional.
 - Commit in small focused checkpoints; don’t batch unrelated changes.
-- Run `simplify` before closing non-trivial implementation work.
 
 ## Product
 - This repo is building a Codex-style desktop app for `pi`; preserve that product direction.

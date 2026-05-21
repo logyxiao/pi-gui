@@ -111,4 +111,5 @@ export interface RefreshStateOptions {
   readonly activeView?: AppView;
   readonly markSelectedSessionViewed?: boolean;
   readonly hydrateSelectedSession?: boolean;
+  readonly hydrateRuntime?: boolean;
 }

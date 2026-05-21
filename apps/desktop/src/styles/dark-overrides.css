@@ -90,6 +90,19 @@
   border-color: var(--line);
 }
 
+:root.dark .message-code-block__copy {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(35, 38, 48, 0.82);
+  color: var(--muted-strong);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.24);
+}
+
+:root.dark .message-code-block__copy:hover,
+:root.dark .message-code-block__copy:focus-visible {
+  background: rgba(50, 54, 68, 0.96);
+  color: var(--text-strong);
+}
+
 :root.dark .message__content blockquote {
   border-left-color: var(--line);
 }

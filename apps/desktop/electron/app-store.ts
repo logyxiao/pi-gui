@@ -696,7 +696,10 @@ export class DesktopAppStore implements AppStoreInternals {
 
   private async initializeInternal(): Promise<void> {
     try {
+      const initializeStartedAt = Date.now();
+      const readUiStateStartedAt = Date.now();
       const persisted = await this.readUiState();
+      logSlowStartupStep("read UI state", readUiStateStartedAt);
       this.state = {
         ...this.state,
         activeView: persisted.activeView ?? this.state.activeView,
@@ -713,7 +716,9 @@ export class DesktopAppStore implements AppStoreInternals {
         workspaceOrder: persisted.workspaceOrder ?? [],
         sidebarCollapsed: persisted.sidebarCollapsed ?? this.state.sidebarCollapsed,
       };
+      const migrateStartedAt = Date.now();
       await this.migrateLegacyPersistence(persisted);
+      logSlowStartupStep("migrate legacy persistence", migrateStartedAt);
       this.sessionState.lastViewedAtBySession.clear();
       for (const [key, viewedAt] of Object.entries(persisted.lastViewedAtBySession ?? {})) {
         if (viewedAt) {
@@ -733,7 +738,9 @@ export class DesktopAppStore implements AppStoreInternals {
         this.extensionCommandCompatibilityByWorkspace.set(workspaceId, records);
       }
       const initialWorkspacePaths = this.initialWorkspacePaths.map((path) => path.trim()).filter(Boolean);
+      const listWorkspacesStartedAt = Date.now();
       const knownWorkspaces = await this.driver.listWorkspaces();
+      logSlowStartupStep("list workspaces", listWorkspacesStartedAt);
       const workspacesToSync = new Map<string, string | undefined>();
 
       for (const workspacePath of initialWorkspacePaths) {
@@ -744,21 +751,28 @@ export class DesktopAppStore implements AppStoreInternals {
         workspacesToSync.set(ws.path, ws.displayName);
       }
 
+      const syncWorkspacesStartedAt = Date.now();
       await Promise.all(
         [...workspacesToSync.entries()].map(([workspacePath, displayName]) =>
           this.driver.syncWorkspace(workspacePath, displayName),
         ),
       );
+      logSlowStartupStep("sync workspaces", syncWorkspacesStartedAt);
 
+      const refreshStartedAt = Date.now();
       await this.refreshState({
         selectedWorkspaceId: persisted.selectedWorkspaceId,
         selectedSessionId: persisted.selectedSessionId,
         composerDraft: persisted.composerDraft,
         clearLastError: true,
-        refreshWorktrees: true,
+        refreshWorktrees: false,
         hydrateSelectedSession: false,
+        hydrateRuntime: false,
       });
+      logSlowStartupStep("initial refresh state", refreshStartedAt);
       this.startSelectedSessionHydration(this.selectedSessionRef());
+      this.startStartupWorktreeRefresh();
+      logSlowStartupStep("store initialize", initializeStartedAt, 200);
     } catch (error) {
       this.state = {
         ...createEmptyDesktopAppState(),
@@ -801,6 +815,7 @@ export class DesktopAppStore implements AppStoreInternals {
   async refreshState(options: RefreshStateOptions = {}): Promise<DesktopAppState> {
     this.refreshStateDepth += 1;
     try {
+      const hydrateRuntime = options.hydrateRuntime !== false;
       const previousSelectedKey = this.currentSelectedSessionKey();
       const [workspacesSnapshot, sessionsSnapshot] = await Promise.all([
         this.driver.listWorkspaces(),
@@ -854,33 +869,18 @@ export class DesktopAppStore implements AppStoreInternals {
         }
       }
 
-      if (selectedWorkspaceId && !this.runtimeByWorkspace.has(selectedWorkspaceId)) {
+      if (hydrateRuntime && selectedWorkspaceId && !this.runtimeByWorkspace.has(selectedWorkspaceId)) {
         await this.ensureRuntimeLoaded(selectedWorkspaceId, workspacesSnapshot.workspaces);
       }
-      const secondaryWorkspacesToLoad = workspacesSnapshot.workspaces
-        .filter((workspace) => workspace.workspaceId !== selectedWorkspaceId)
-        .filter((workspace) => !this.runtimeByWorkspace.has(workspace.workspaceId));
-      const secondaryRuntimeLoads = await Promise.allSettled(
-        secondaryWorkspacesToLoad.map((workspace) => this.ensureRuntimeLoaded(workspace.workspaceId, workspacesSnapshot.workspaces)),
-      );
-      secondaryRuntimeLoads.forEach((result, index) => {
-        if (result.status === "fulfilled") {
-          return;
-        }
-        const failedWorkspace = secondaryWorkspacesToLoad[index];
-        console.warn(
-          `[pi-gui] Failed to preload runtime for ${failedWorkspace?.path ?? "unknown workspace"}: ${
-            result.reason instanceof Error ? result.reason.message : String(result.reason)
-          }`,
-        );
-      });
       for (const runtime of this.runtimeByWorkspace.values()) {
         pruneCompatibilityForRuntimeSnapshot(this.extensionCommandCompatibilityByWorkspace, runtime);
       }
-      const liveGlobalModelSettings = await this.loadLiveGlobalModelSettings(
-        workspacesSnapshot.workspaces,
-        selectedWorkspaceId || workspacesSnapshot.workspaces[0]?.workspaceId,
-      );
+      const liveGlobalModelSettings = hydrateRuntime
+        ? await this.loadLiveGlobalModelSettings(
+            workspacesSnapshot.workspaces,
+            selectedWorkspaceId || workspacesSnapshot.workspaces[0]?.workspaceId,
+          )
+        : this.state.globalModelSettings;
       const globalModelSettings =
         this.state.modelSettingsScopeMode === "per-repo" && hasStoredModelSettings(this.state.globalModelSettings)
           ? this.state.globalModelSettings
@@ -893,7 +893,7 @@ export class DesktopAppStore implements AppStoreInternals {
         await this.restoreGlobalModelSettings(globalModelSettings, workspacesSnapshot.workspaces, selectedWorkspaceId);
       }
       const scopedModelSettingsByWorkspace =
-        this.state.modelSettingsScopeMode === "per-repo"
+        hydrateRuntime && this.state.modelSettingsScopeMode === "per-repo"
           ? await this.loadScopedModelSettingsByWorkspace(workspaces, workspacesSnapshot.workspaces, globalModelSettings)
           : undefined;
       const runtimeByWorkspace = this.serializeEffectiveRuntimeState(workspaces, scopedModelSettingsByWorkspace);
@@ -1902,6 +1902,18 @@ export class DesktopAppStore implements AppStoreInternals {
     });
   }
 
+  private startStartupWorktreeRefresh(): void {
+    void this.refreshState({
+      clearLastError: true,
+      refreshWorktrees: true,
+      hydrateSelectedSession: false,
+      hydrateRuntime: false,
+      markSelectedSessionViewed: false,
+    }).catch((error: unknown) => {
+      console.warn(`[pi-gui] Startup worktree refresh failed: ${error instanceof Error ? error.message : String(error)}`);
+    });
+  }
+
   private async handleSelectedSessionHydrationError(
     sessionRef: SessionRef,
     selectionEpoch: number,
@@ -2318,6 +2330,13 @@ function sameTranscriptMessage(
     left.role === right.role &&
     left.text === right.text &&
     left.createdAt === right.createdAt;
+}
+
+function logSlowStartupStep(label: string, startedAt: number, thresholdMs = 100): void {
+  const elapsedMs = Date.now() - startedAt;
+  if (elapsedMs >= thresholdMs) {
+    console.info(`[pi-gui] startup ${label}: ${elapsedMs}ms`);
+  }
 }
 
 function resolveSelectedSessionIdFromCatalog(

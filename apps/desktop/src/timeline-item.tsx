@@ -4,6 +4,7 @@ import type { TimelineActivity, TimelineToolCall, TimelineSummary, TranscriptMes
 import { MessageMarkdown } from "./message-markdown";
 import { InlineDiff, extractDiffFromOutput } from "./diff-inline";
 import { ChevronRightIcon, CopyIcon, DiffIcon, FileIcon } from "./icons";
+import { useI18n, type I18nContextValue } from "./i18n";
 import { extensionToLanguage } from "./syntax-highlight";
 
 function TimelineItemComponent({
@@ -95,11 +96,19 @@ function TimelineMessage({ item }: { readonly item: SessionTranscriptMessage }) 
 }
 
 function TimelineActivityItem({ item }: { readonly item: TimelineActivity }) {
+  const { t } = useI18n();
+  const isWorking = isWorkingTimelineLabel(item.label);
   return (
-    <div className={`timeline-activity timeline-activity--${item.tone ?? "neutral"}`}>
-      <span className="timeline-activity__label">{item.label}</span>
+    <div className={`timeline-activity timeline-activity--${item.tone ?? "neutral"} ${isWorking ? "timeline-activity--working" : ""}`}>
+      {isWorking ? (
+        <span className="timeline-activity__collision" aria-hidden="true">
+          <span />
+          <span />
+        </span>
+      ) : null}
+      <span className="timeline-activity__label">{localizeTimelineLabel(item.label, t)}</span>
       {item.detail ? <span className="timeline-activity__detail">{item.detail}</span> : null}
-      {item.metadata ? <span className="timeline-activity__meta">{item.metadata}</span> : null}
+      {item.metadata ? <span className="timeline-activity__meta">{localizeTimelineLabel(item.metadata, t)}</span> : null}
     </div>
   );
 }
@@ -268,19 +277,95 @@ function statusLabel(status: "running" | "success" | "error") {
 }
 
 function TimelineSummaryItem({ item }: { readonly item: TimelineSummary }) {
+  const { t } = useI18n();
+  const label = localizeTimelineLabel(item.label, t);
+  const metadata = item.metadata ? localizeTimelineLabel(item.metadata, t) : undefined;
+
   if (item.presentation === "divider") {
     return (
       <div className="timeline-summary">
-        <span>{item.label}</span>
-        {item.metadata ? <span className="timeline-summary__meta">{item.metadata}</span> : null}
+        <span>{label}</span>
+        {metadata ? <span className="timeline-summary__meta">{metadata}</span> : null}
       </div>
     );
   }
 
   return (
     <div className="timeline-activity timeline-activity--summary">
-      <span className="timeline-activity__label">{item.label}</span>
-      {item.metadata ? <span className="timeline-activity__meta">{item.metadata}</span> : null}
+      <span className="timeline-activity__label">{label}</span>
+      {metadata ? <span className="timeline-activity__meta">{metadata}</span> : null}
     </div>
   );
+}
+
+function isWorkingTimelineLabel(label: string): boolean {
+  return label === "Working…" || label === "Working...";
+}
+
+function localizeTimelineLabel(label: string, t: I18nContextValue["t"]): string {
+  if (isWorkingTimelineLabel(label)) {
+    return t("timeline.working");
+  }
+
+  const workingFor = /^Working for (.+)$/.exec(label);
+  if (workingFor?.[1]) {
+    return t("timeline.workingFor", { duration: localizeTimelineDuration(workingFor[1], t) });
+  }
+
+  const workedFor = /^Worked for (.+)$/.exec(label);
+  if (workedFor?.[1]) {
+    return t("timeline.workedFor", { duration: localizeTimelineDuration(workedFor[1], t) });
+  }
+
+  return localizeTimelineSummaryLabel(label, t);
+}
+
+function localizeTimelineSummaryLabel(label: string, t: I18nContextValue["t"]): string {
+  return label.split(", ").map((part) => {
+    const explored = /^Explored (\d+) files?$/.exec(part);
+    if (explored?.[1]) {
+      const count = Number(explored[1]);
+      return t(count === 1 ? "timeline.exploredFile" : "timeline.exploredFiles", { count });
+    }
+
+    const searches = /^(\d+) search(?:es)?$/.exec(part);
+    if (searches?.[1]) {
+      const count = Number(searches[1]);
+      return t(count === 1 ? "timeline.search" : "timeline.searches", { count });
+    }
+
+    const tools = /^Used (\d+) tools?$/.exec(part);
+    if (tools?.[1]) {
+      const count = Number(tools[1]);
+      return t(count === 1 ? "timeline.usedTool" : "timeline.usedTools", { count });
+    }
+
+    if (part === "Completed") {
+      return t("timeline.completed");
+    }
+
+    return part;
+  }).join(t("timeline.summarySeparator"));
+}
+
+function localizeTimelineDuration(duration: string, t: I18nContextValue["t"]): string {
+  const minutesSeconds = /^(\d+)m (\d+)s$/.exec(duration);
+  if (minutesSeconds?.[1] && minutesSeconds[2]) {
+    return t("timeline.durationMinutesSeconds", {
+      minutes: Number(minutesSeconds[1]),
+      seconds: Number(minutesSeconds[2]),
+    });
+  }
+
+  const minutes = /^(\d+)m$/.exec(duration);
+  if (minutes?.[1]) {
+    return t("timeline.durationMinutes", { minutes: Number(minutes[1]) });
+  }
+
+  const seconds = /^(\d+)s$/.exec(duration);
+  if (seconds?.[1]) {
+    return t("timeline.durationSeconds", { seconds: Number(seconds[1]) });
+  }
+
+  return duration;
 }

@@ -337,7 +337,7 @@ function ComposerPanelComponent({
                   <div className="composer__action-tooltip-wrap">
                     <button
                       aria-label={primaryActionIsStop ? t("composer.stopRun") : t("composer.sendMessage")}
-                      className="icon-button composer__action-button composer__send-button"
+                      className={`icon-button composer__action-button composer__send-button ${primaryActionIsStop ? "composer__send-button--running" : ""}`}
                       data-testid="send"
                       type="button"
                       disabled={

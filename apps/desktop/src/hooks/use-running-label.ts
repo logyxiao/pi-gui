@@ -1,38 +1,43 @@
 import { useEffect, useState } from "react";
+import { useI18n } from "../i18n";
 
 export function useRunningLabel(startedAt: string | undefined) {
-  const [label, setLabel] = useState(() => formatRunningLabel(startedAt));
+  const { t } = useI18n();
+  const [label, setLabel] = useState(() => formatRunningLabel(startedAt, t));
 
   useEffect(() => {
-    setLabel(formatRunningLabel(startedAt));
+    setLabel(formatRunningLabel(startedAt, t));
     if (!startedAt) {
       return undefined;
     }
 
     const interval = window.setInterval(() => {
-      setLabel(formatRunningLabel(startedAt));
+      setLabel(formatRunningLabel(startedAt, t));
     }, 1000);
 
     return () => {
       window.clearInterval(interval);
     };
-  }, [startedAt]);
+  }, [startedAt, t]);
 
   return label;
 }
 
-function formatRunningLabel(startedAt: string | undefined): string {
+function formatRunningLabel(startedAt: string | undefined, t: ReturnType<typeof useI18n>["t"]): string {
   if (!startedAt) {
-    return "Working…";
+    return t("timeline.working");
   }
 
   const diffMs = Math.max(0, Date.now() - Date.parse(startedAt));
   const seconds = Math.max(1, Math.floor(diffMs / 1000));
   if (seconds < 60) {
-    return `Working for ${seconds}s`;
+    return t("timeline.workingFor", { duration: t("timeline.durationSeconds", { seconds }) });
   }
 
   const minutes = Math.floor(seconds / 60);
   const remaining = seconds % 60;
-  return remaining === 0 ? `Working for ${minutes}m` : `Working for ${minutes}m ${remaining}s`;
+  const duration = remaining === 0
+    ? t("timeline.durationMinutes", { minutes })
+    : t("timeline.durationMinutesSeconds", { minutes, seconds: remaining });
+  return t("timeline.workingFor", { duration });
 }

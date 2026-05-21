@@ -619,7 +619,9 @@ app.whenReady().then(async () => {
   if (!hasSingleInstanceLock) {
     return;
   }
-  await hydrateProcessPathFromLoginShell();
+  void hydrateProcessPathFromLoginShell().catch((error: unknown) => {
+    console.warn(`[pi-gui] Failed to hydrate PATH from login shell: ${error instanceof Error ? error.message : String(error)}`);
+  });
   languageMode = await resolveInitialLanguageMode();
   setMainLanguage(languageMode);
 
@@ -649,8 +651,9 @@ app.whenReady().then(async () => {
     generateThreadTitleOverride: async (workspace, options) => generateThreadTitleOverride?.(workspace, options),
     generateCommitMessageOverride: async (workspace, options) => generateCommitMessageOverride?.(workspace, options),
   });
-  await store.initialize();
-  integratedTerminalShell = (await store.getState()).integratedTerminalShell;
+  void store.initialize().catch((error: unknown) => {
+    console.warn(`[pi-gui] Store initialization failed: ${error instanceof Error ? error.message : String(error)}`);
+  });
   stopPruningTerminals = store.subscribe((state) => {
     integratedTerminalShell = state.integratedTerminalShell;
     const workspacePaths = state.workspaces.map((workspace) => workspace.path);
