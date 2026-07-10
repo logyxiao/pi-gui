@@ -30,11 +30,39 @@ export function useDesktopAppState() {
         setSelectedTranscript(payload);
       }
     });
+    const unsubscribeTranscriptDelta = api.onSelectedTranscriptDelta((delta) => {
+      if (!active) return;
+      setSelectedTranscript((current) => {
+        if (!current || current.workspaceId !== delta.workspaceId || current.sessionId !== delta.sessionId) return current;
+        if (delta.kind === "appendAssistantText") {
+          const last = current.transcript.at(-1);
+          if (last?.kind === "message" && last.id === delta.messageId) {
+            return { ...current, transcript: [...current.transcript.slice(0, -1), { ...last, text: `${last.text}${delta.text}` }] };
+          }
+          return {
+            ...current,
+            transcript: [...current.transcript, {
+              kind: "message",
+              id: delta.messageId,
+              role: "assistant",
+              text: delta.text,
+              createdAt: delta.createdAt,
+            }],
+          };
+        }
+        const index = current.transcript.findIndex((item) => item.id === delta.item.id);
+        if (index < 0) return { ...current, transcript: [...current.transcript, delta.item] };
+        const transcript = [...current.transcript];
+        transcript[index] = delta.item;
+        return { ...current, transcript };
+      });
+    });
 
     return () => {
       active = false;
       unsubscribeState();
       unsubscribeTranscript();
+      unsubscribeTranscriptDelta();
     };
   }, []);
 
@@ -42,12 +70,9 @@ export function useDesktopAppState() {
 }
 
 export function updateSnapshot(
-  api: NonNullable<typeof window.piApp>,
-  setSnapshot: Dispatch<SetStateAction<DesktopAppState | null>>,
+  _api: NonNullable<typeof window.piApp>,
+  _setSnapshot: Dispatch<SetStateAction<DesktopAppState | null>>,
   action: () => Promise<DesktopAppState>,
 ) {
-  return action().then((state) => {
-    setSnapshot(state);
-    return state;
-  });
+  return action();
 }

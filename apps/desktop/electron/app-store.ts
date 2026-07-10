@@ -46,6 +46,7 @@ import {
   type NotificationPreferences,
   type QueuedComposerMessage,
   type RemoveWorktreeInput,
+  type SelectedTranscriptDelta,
   type SelectedTranscriptRecord,
   type StartThreadInput,
   type TranscriptMessage,
@@ -108,6 +109,7 @@ import { isSessionActivelyViewed } from "./session-visibility";
 
 type StateListener = (state: DesktopAppState) => void;
 type SelectedTranscriptListener = (payload: SelectedTranscriptRecord | null) => void;
+type SelectedTranscriptDeltaListener = (payload: SelectedTranscriptDelta) => void;
 type SessionEventListener = (event: SessionDriverEvent, state: DesktopAppState) => void | Promise<void>;
 type TranscriptMessageRow = Extract<TranscriptMessage, { kind: "message" }>;
 
@@ -146,6 +148,7 @@ export class DesktopAppStore implements AppStoreInternals {
   state = createEmptyDesktopAppState();
   private readonly listeners = new Set<StateListener>();
   private readonly selectedTranscriptListeners = new Set<SelectedTranscriptListener>();
+  private readonly selectedTranscriptDeltaListeners = new Set<SelectedTranscriptDeltaListener>();
   private readonly sessionEventListeners = new Set<SessionEventListener>();
   readonly driver: PiSdkDriver;
   readonly catalogStore: JsonCatalogStore;
@@ -250,6 +253,13 @@ export class DesktopAppStore implements AppStoreInternals {
     void this.getSelectedTranscript().then(listener).catch(() => undefined);
     return () => {
       this.selectedTranscriptListeners.delete(listener);
+    };
+  }
+
+  subscribeToSelectedTranscriptDelta(listener: SelectedTranscriptDeltaListener): () => void {
+    this.selectedTranscriptDeltaListeners.add(listener);
+    return () => {
+      this.selectedTranscriptDeltaListeners.delete(listener);
     };
   }
 
@@ -358,7 +368,7 @@ export class DesktopAppStore implements AppStoreInternals {
 
   /* ── Composer methods (delegated) ──────────────────────── */
 
-  async updateComposerDraft(composerDraft: string): Promise<DesktopAppState> {
+  async updateComposerDraft(composerDraft: string): Promise<void> {
     return composer.updateComposerDraft(this, composerDraft);
   }
 
@@ -1162,13 +1172,11 @@ export class DesktopAppStore implements AppStoreInternals {
   }
 
   async refreshSessionCommandsForWorkspace(workspaceId: string): Promise<void> {
-    const sessionRefs = this.sessionRefsForWorkspace(workspaceId);
-    await Promise.all(sessionRefs.map((sessionRef) => this.refreshSessionCommands(sessionRef)));
+    await runWithConcurrency(this.sessionRefsForWorkspace(workspaceId), 4, (sessionRef) => this.refreshSessionCommands(sessionRef));
   }
 
   async reloadSessionsForWorkspace(workspaceId: string): Promise<void> {
-    const sessionRefs = this.sessionRefsForWorkspace(workspaceId);
-    await Promise.all(sessionRefs.map((sessionRef) => this.driver.reloadSession(sessionRef)));
+    await runWithConcurrency(this.sessionRefsForWorkspace(workspaceId), 4, (sessionRef) => this.driver.reloadSession(sessionRef));
   }
 
   clearExtensionUiForWorkspace(workspaceId: string): void {
@@ -1309,9 +1317,19 @@ export class DesktopAppStore implements AppStoreInternals {
     }
 
     switch (event.type) {
-      case "assistantDelta":
-        appendAssistantDelta(this.sessionState.transcriptCache, this.sessionState.activeAssistantMessageBySession, event.sessionRef, event.text);
-        break;
+      case "assistantDelta": {
+        const message = appendAssistantDelta(this.sessionState.transcriptCache, this.sessionState.activeAssistantMessageBySession, event.sessionRef, event.text);
+        this.persistTranscriptCacheForSession(event.sessionRef);
+        this.publishSelectedTranscriptDelta({
+          kind: "appendAssistantText",
+          workspaceId: event.sessionRef.workspaceId,
+          sessionId: event.sessionRef.sessionId,
+          messageId: message.id,
+          createdAt: message.createdAt,
+          text: event.text,
+        });
+        return;
+      }
       case "sessionOpened":
       case "runCompleted":
         this.updateSessionConfig(event.sessionRef, event.snapshot.config);
@@ -1366,12 +1384,22 @@ export class DesktopAppStore implements AppStoreInternals {
       this.sessionState.sessionErrorsBySession.delete(key);
     }
 
-    applyTimelineEvent(this.sessionState.transcriptCache, event, {
+    const changedTimelineItem = applyTimelineEvent(this.sessionState.transcriptCache, event, {
       runMetricsBySession: this.sessionState.runMetricsBySession,
       runningSinceBySession: this.sessionState.runningSinceBySession,
       activeAssistantMessageBySession: this.sessionState.activeAssistantMessageBySession,
       activeWorkingActivityBySession: this.sessionState.activeWorkingActivityBySession,
     });
+    if (changedTimelineItem && (event.type === "toolStarted" || event.type === "toolUpdated" || event.type === "toolFinished")) {
+      this.persistTranscriptCacheForSession(event.sessionRef);
+      this.publishSelectedTranscriptDelta({
+        kind: "upsertItem",
+        workspaceId: event.sessionRef.workspaceId,
+        sessionId: event.sessionRef.sessionId,
+        item: cloneTranscriptMessage(changedTimelineItem),
+      });
+      return;
+    }
     this.state = applySessionEventState(
       this.state,
       event,
@@ -1804,6 +1832,11 @@ export class DesktopAppStore implements AppStoreInternals {
       return;
     }
     this.publishSelectedTranscript();
+  }
+
+  private publishSelectedTranscriptDelta(payload: SelectedTranscriptDelta): void {
+    if (!this.isSelectedSession(payload)) return;
+    for (const listener of this.selectedTranscriptDeltaListeners) listener(payload);
   }
 
   handleWindowActivation(): void {
@@ -2266,6 +2299,17 @@ function updateRecordValue<T>(
   };
 }
 
+
+async function runWithConcurrency<T>(items: readonly T[], limit: number, action: (item: T) => Promise<unknown>): Promise<void> {
+  let nextIndex = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (nextIndex < items.length) {
+      const item = items[nextIndex];
+      nextIndex += 1;
+      if (item !== undefined) await action(item);
+    }
+  }));
+}
 
 function formatCapabilityLabel(capability: string): string {
   switch (capability) {

@@ -73,19 +73,16 @@ export function appendAssistantDelta(
   activeAssistantMessageBySession: Map<string, string>,
   sessionRef: SessionRef,
   text: string,
-): void {
+): Extract<TranscriptMessage, { kind: "message" }> {
   const key = sessionKey(sessionRef);
-  const transcript = [...(transcriptCache.get(key) ?? [])];
+  const transcript = transcriptCache.get(key) ?? [];
   const activeId = activeAssistantMessageBySession.get(key);
 
   if (activeId) {
-    const index = transcript.findIndex((message) => message.id === activeId);
-    const current = index >= 0 ? transcript[index] : undefined;
-    if (current?.kind === "message") {
-      transcript[index] = {
-        ...current,
-        text: `${current.text}${text}`,
-      };
+    const index = transcript.length - 1;
+    const current = transcript[index];
+    if (current?.kind === "message" && current.id === activeId) {
+      transcript[index] = { ...current, text: `${current.text}${text}` };
     } else {
       const message = makeTranscriptMessage("assistant", text);
       transcript.push(message);
@@ -98,6 +95,9 @@ export function appendAssistantDelta(
   }
 
   transcriptCache.set(key, transcript);
+  const message = transcript.at(-1);
+  if (message?.kind !== "message") throw new Error("Assistant delta did not produce a message");
+  return message;
 }
 
 export function clearActiveAssistantMessage(
@@ -111,7 +111,7 @@ export function applyTimelineEvent(
   transcriptCache: Map<string, TranscriptMessage[]>,
   event: SessionDriverEvent,
   state: TimelineRuntimeState,
-): void {
+): TranscriptMessage | undefined {
   if (event.type === "assistantDelta") {
     return;
   }
@@ -219,6 +219,9 @@ export function applyTimelineEvent(
   }
 
   transcriptCache.set(key, transcript);
+  if (event.type === "toolStarted" || event.type === "toolUpdated" || event.type === "toolFinished") {
+    return transcript.find((item) => item.kind === "tool" && item.callId === event.callId);
+  }
 }
 
 function upsertToolRow(

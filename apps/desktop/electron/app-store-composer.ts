@@ -27,7 +27,7 @@ import { serializeStoreRequest } from "./app-store-request-locks";
 export async function updateComposerDraft(
   store: AppStoreInternals,
   composerDraft: string,
-): Promise<DesktopAppState> {
+): Promise<void> {
   await store.initialize();
   const sessionRef = store.selectedSessionRef();
   if (sessionRef) {
@@ -47,7 +47,6 @@ export async function updateComposerDraft(
     revision: store.state.revision + 1,
   };
   store.schedulePersistUiState();
-  return store.emit();
 }
 
 export async function addComposerAttachments(

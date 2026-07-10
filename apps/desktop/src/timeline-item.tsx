@@ -1,11 +1,13 @@
-import { memo } from "react";
+import { lazy, memo, Suspense } from "react";
 import type { SessionTranscriptMessage } from "@pi-gui/pi-sdk-driver";
 import type { TimelineActivity, TimelineToolCall, TimelineSummary, TranscriptMessage } from "./timeline-types";
 import { MessageMarkdown } from "./message-markdown";
-import { InlineDiff, extractDiffFromOutput } from "./diff-inline";
+import { extractDiffFromOutput } from "./diff-output";
 import { ChevronRightIcon, CopyIcon, DiffIcon, FileIcon } from "./icons";
 import { useI18n, type I18nContextValue } from "./i18n";
-import { extensionToLanguage } from "./syntax-highlight";
+import { extensionToLanguage } from "./syntax-language";
+
+const InlineDiff = lazy(() => import("./diff-inline").then(({ InlineDiff }) => ({ default: InlineDiff })));
 
 function TimelineItemComponent({
   item,
@@ -194,7 +196,9 @@ function TimelineToolCallItem({
                   <CopyIcon />
                 </button>
               </div>
-              <InlineDiff diff={diffText} language={diffLanguage} />
+              <Suspense fallback={<pre className="diff-inline">{diffText}</pre>}>
+                <InlineDiff diff={diffText} language={diffLanguage} />
+              </Suspense>
             </>
           ) : (
             <>

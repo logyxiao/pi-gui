@@ -59,12 +59,11 @@ import {
   fetchProviderModels,
   probeProvider,
   readModelsJson,
-  syncCcSwitchProviders,
   syncEnabledModelsToSettings,
   testProvider,
   writeModelsJson,
 } from "./models-json-service";
-import type { DesktopAppState, LanguageMode, ThemeMode } from "../src/desktop-state";
+import type { DesktopAppState, LanguageMode, SelectedTranscriptDelta, ThemeMode } from "../src/desktop-state";
 import { desktopIpc, getDesktopCommandFromShortcut } from "../src/ipc";
 import { getProjectOpenApp, isProjectOpenAppId, type ProjectOpenAppId } from "../src/project-open-apps";
 import { SUPPORTED_COMPOSER_IMAGE_TYPES } from "../src/composer-attachments";
@@ -95,6 +94,7 @@ let integratedTerminalShell = "";
 let languageMode: LanguageMode = "en";
 let stopPublishingState: (() => void) | undefined;
 let stopPublishingSelectedTranscript: (() => void) | undefined;
+let stopPublishingSelectedTranscriptDelta: (() => void) | undefined;
 let stopTrackingWindowActivation: (() => void) | undefined;
 let stopNotifications: (() => void) | undefined;
 let stopUpdateChecker: (() => void) | undefined;
@@ -399,27 +399,55 @@ function attachStatePublisher(window: BrowserWindow): void {
   const webContentsId = window.webContents.id;
   stopPublishingState?.();
   stopPublishingSelectedTranscript?.();
+  stopPublishingSelectedTranscriptDelta?.();
   stopPublishingState = store.subscribe((state) => {
     if (canPublishToWindow(window)) {
       window.webContents.send(desktopIpc.stateChanged, state);
     }
   });
+  let pendingTranscriptDelta: SelectedTranscriptDelta | undefined;
+  let transcriptDeltaTimer: NodeJS.Timeout | undefined;
+  const flushTranscriptDelta = () => {
+    if (transcriptDeltaTimer) clearTimeout(transcriptDeltaTimer);
+    transcriptDeltaTimer = undefined;
+    const payload = pendingTranscriptDelta;
+    pendingTranscriptDelta = undefined;
+    if (payload && canPublishToWindow(window)) window.webContents.send(desktopIpc.selectedTranscriptDelta, payload);
+  };
   stopPublishingSelectedTranscript = store.subscribeToSelectedTranscript((payload) => {
-    if (canPublishToWindow(window)) {
-      window.webContents.send(desktopIpc.selectedTranscriptChanged, payload);
-    }
+    flushTranscriptDelta();
+    if (canPublishToWindow(window)) window.webContents.send(desktopIpc.selectedTranscriptChanged, payload);
+  });
+  stopPublishingSelectedTranscriptDelta = store.subscribeToSelectedTranscriptDelta((payload) => {
+    const pending = pendingTranscriptDelta;
+    const sameSession = pending?.workspaceId === payload.workspaceId && pending.sessionId === payload.sessionId;
+    const canMergeText = sameSession && pending?.kind === "appendAssistantText" && payload.kind === "appendAssistantText" &&
+      pending.messageId === payload.messageId;
+    const canReplaceItem = sameSession && pending?.kind === "upsertItem" && payload.kind === "upsertItem" &&
+      pending.item.id === payload.item.id;
+    if (pending && !canMergeText && !canReplaceItem) flushTranscriptDelta();
+    pendingTranscriptDelta = canMergeText && pending?.kind === "appendAssistantText" && payload.kind === "appendAssistantText"
+      ? { ...payload, text: `${pending.text}${payload.text}` }
+      : payload;
+    transcriptDeltaTimer ??= setTimeout(flushTranscriptDelta, 16);
   });
   window.webContents.once("render-process-gone", () => {
     stopPublishingState?.();
     stopPublishingState = undefined;
     stopPublishingSelectedTranscript?.();
     stopPublishingSelectedTranscript = undefined;
+    stopPublishingSelectedTranscriptDelta?.();
+    stopPublishingSelectedTranscriptDelta = undefined;
+    if (transcriptDeltaTimer) clearTimeout(transcriptDeltaTimer);
   });
   window.once("closed", () => {
     stopPublishingState?.();
     stopPublishingState = undefined;
     stopPublishingSelectedTranscript?.();
     stopPublishingSelectedTranscript = undefined;
+    stopPublishingSelectedTranscriptDelta?.();
+    stopPublishingSelectedTranscriptDelta = undefined;
+    if (transcriptDeltaTimer) clearTimeout(transcriptDeltaTimer);
     if (mainWindow === window) {
       mainWindow = null;
     }
@@ -856,7 +884,6 @@ app.whenReady().then(async () => {
   registerRendererIpc(desktopIpc.testProvider, async (_event, provider) => testProvider(assertProviderInput(provider)));
   registerRendererIpc(desktopIpc.probeProvider, async (_event, provider) => probeProvider(assertProviderInput(provider)));
   registerRendererIpc(desktopIpc.syncEnabledModels, async (_event, modelsJson) => syncEnabledModelsToSettings(assertModelsJson(modelsJson)));
-  registerRendererIpc(desktopIpc.syncCcSwitchProviders, async () => syncCcSwitchProviders());
   registerRendererIpc(desktopIpc.terminalEnsurePanel, (event, workspaceId: string, terminalScopeId: string, size) => {
     return getTerminalService().ensurePanel(event.sender, workspaceId, terminalScopeId, size);
   });
@@ -976,12 +1003,10 @@ app.whenReady().then(async () => {
     }
     return getChangedFiles(workspacePath);
   });
-  registerRendererIpc(desktopIpc.getFileDiff, async (_event, workspaceId: string, filePath: string, staged?: boolean) => {
+  registerRendererIpc(desktopIpc.getFileDiff, async (_event, workspaceId: string, filePath: string, mode?: "unstaged" | "staged" | "untracked") => {
     const workspacePath = store.getWorkspacePath(workspaceId);
-    if (!workspacePath) {
-      return "";
-    }
-    return getFileDiff(workspacePath, filePath, staged === true);
+    if (!workspacePath) return "";
+    return getFileDiff(workspacePath, filePath, mode);
   });
   registerRendererIpc(desktopIpc.stageFile, async (_event, workspaceId: string, filePath: string) => {
     const workspacePath = store.getWorkspacePath(workspaceId);

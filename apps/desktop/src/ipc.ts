@@ -14,12 +14,12 @@ import type {
   ModelSettingsScopeMode,
   NotificationPreferences,
   RemoveWorktreeInput,
+  SelectedTranscriptDelta,
   SelectedTranscriptRecord,
   StartThreadInput,
   WorkspaceSessionTarget,
 } from "./desktop-state";
 import type {
-  CcSwitchSyncResult,
   ModelsJsonFile,
   ModelsJsonSaveResult,
   ProviderProbeResult,
@@ -38,6 +38,7 @@ export const desktopIpc = {
   stateChanged: "pi-gui:state-changed",
   selectedTranscriptRequest: "pi-gui:selected-transcript-request",
   selectedTranscriptChanged: "pi-gui:selected-transcript-changed",
+  selectedTranscriptDelta: "pi-gui:selected-transcript-delta",
   appCommand: "pi-gui:app-command",
   workspacePicked: "pi-gui:workspace-picked",
   clipboardImagePasted: "pi-gui:clipboard-image-pasted",
@@ -86,7 +87,6 @@ export const desktopIpc = {
   testProvider: "pi-gui:test-provider",
   probeProvider: "pi-gui:probe-provider",
   syncEnabledModels: "pi-gui:sync-enabled-models",
-  syncCcSwitchProviders: "pi-gui:sync-cc-switch-providers",
   terminalEnsurePanel: "pi-gui:terminal-ensure-panel",
   terminalCreateSession: "pi-gui:terminal-create-session",
   terminalSetActiveSession: "pi-gui:terminal-set-active-session",
@@ -152,6 +152,7 @@ export function getDesktopShortcutLabel(platform: NodeJS.Platform, key: string):
 
 export type PiDesktopStateListener = (state: DesktopAppState) => void;
 export type PiDesktopSelectedTranscriptListener = (payload: SelectedTranscriptRecord | null) => void;
+export type PiDesktopSelectedTranscriptDeltaListener = (payload: SelectedTranscriptDelta) => void;
 export type PiDesktopCommand = (typeof desktopCommands)[keyof typeof desktopCommands];
 
 export interface TerminalSize {
@@ -242,6 +243,7 @@ export interface PiDesktopApi {
   onStateChanged(listener: PiDesktopStateListener): () => void;
   getSelectedTranscript(): Promise<SelectedTranscriptRecord | null>;
   onSelectedTranscriptChanged(listener: PiDesktopSelectedTranscriptListener): () => void;
+  onSelectedTranscriptDelta(listener: PiDesktopSelectedTranscriptDeltaListener): () => void;
   onCommand(listener: (command: PiDesktopCommand) => void): () => void;
   onWorkspacePicked(listener: (workspaceId: string) => void): () => void;
   onClipboardImagePasted(listener: (attachment: ComposerImageAttachment) => void): () => void;
@@ -310,7 +312,6 @@ export interface PiDesktopApi {
   testProvider(provider: { readonly baseUrl: string; readonly apiKey?: string; readonly headers?: Record<string, string>; readonly authHeader?: boolean }): Promise<ProviderProbeResult>;
   probeProvider(provider: { readonly baseUrl: string; readonly apiKey?: string; readonly headers?: Record<string, string>; readonly authHeader?: boolean; readonly balanceBaseUrl?: string; readonly balanceApiKey?: string; readonly usageScript?: string }): Promise<ProviderProbeResult>;
   syncEnabledModels(modelsJson: ModelsJsonFile): Promise<string[]>;
-  syncCcSwitchProviders(): Promise<CcSwitchSyncResult>;
   ensureTerminalPanel(
     workspaceId: string,
     terminalScopeId: string,
@@ -349,7 +350,7 @@ export interface PiDesktopApi {
   cancelQueuedComposerEdit(): Promise<DesktopAppState>;
   removeQueuedComposerMessage(messageId: string): Promise<DesktopAppState>;
   steerQueuedComposerMessage(messageId: string): Promise<DesktopAppState>;
-  updateComposerDraft(composerDraft: string): Promise<DesktopAppState>;
+  updateComposerDraft(composerDraft: string): Promise<void>;
   submitComposer(text: string, options?: { readonly deliverAs?: "steer" | "followUp" }): Promise<DesktopAppState>;
   getSessionTree(target: WorkspaceSessionTarget): Promise<SessionTreeSnapshot>;
   navigateSessionTree(
@@ -359,7 +360,7 @@ export interface PiDesktopApi {
   ): Promise<{ readonly state: DesktopAppState; readonly result: NavigateSessionTreeResult }>;
   listWorkspaceFiles(workspaceId: string): Promise<string[]>;
   getChangedFiles(workspaceId: string): Promise<{ path: string; status: "added" | "modified" | "deleted" | "untracked"; staged: boolean; unstaged: boolean; indexStatus: string; worktreeStatus: string }[]>;
-  getFileDiff(workspaceId: string, filePath: string, staged?: boolean): Promise<string>;
+  getFileDiff(workspaceId: string, filePath: string, mode?: "unstaged" | "staged" | "untracked"): Promise<string>;
   stageFile(workspaceId: string, filePath: string): Promise<void>;
   unstageFile(workspaceId: string, filePath: string): Promise<void>;
   discardFileChanges(workspaceId: string, filePath: string): Promise<void>;

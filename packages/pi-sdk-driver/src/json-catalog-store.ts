@@ -198,6 +198,11 @@ export class JsonCatalogStore implements SessionFileCatalogStorage {
   ): Promise<void> {
     await this.mutateState((state) => {
       const nextEntries = entries.map(cloneSessionEntry);
+      const currentEntries = state.sessions.filter((session) => session.workspaceId === workspaceId);
+      const currentFiles = Object.fromEntries(
+        Object.entries(state.sessionFiles).filter(([key]) => key.startsWith(`${workspaceId}:`)),
+      );
+      if (areSessionListsEqual(currentEntries, nextEntries) && areStringRecordsEqual(currentFiles, sessionFiles)) return false;
       const nextKeys = new Set(nextEntries.map((entry) => sessionKey(entry.sessionRef)));
 
       state.sessions = [
@@ -304,6 +309,22 @@ function parseState(raw: string, filePath: string): CatalogFileState {
     worktrees: Array.isArray(parsed.worktrees) ? parsed.worktrees.map(cloneWorktreeEntry) : [],
     sessionFiles: isRecord(parsed.sessionFiles) ? { ...parsed.sessionFiles } : {},
   };
+}
+
+function areSessionListsEqual(left: readonly SessionCatalogEntry[], right: readonly SessionCatalogEntry[]): boolean {
+  if (left.length !== right.length) return false;
+  const rightByKey = new Map(right.map((entry) => [sessionKey(entry.sessionRef), entry]));
+  return left.every((entry) => {
+    const other = rightByKey.get(sessionKey(entry.sessionRef));
+    return other && entry.workspaceId === other.workspaceId && entry.title === other.title && entry.updatedAt === other.updatedAt &&
+      entry.archivedAt === other.archivedAt && entry.previewSnippet === other.previewSnippet &&
+      entry.sessionFilePath === other.sessionFilePath && entry.status === other.status;
+  });
+}
+
+function areStringRecordsEqual(left: Readonly<Record<string, string>>, right: Readonly<Record<string, string>>): boolean {
+  const keys = Object.keys(left);
+  return keys.length === Object.keys(right).length && keys.every((key) => left[key] === right[key]);
 }
 
 function compareWorkspaceEntries(left: WorkspaceCatalogEntry, right: WorkspaceCatalogEntry): number {

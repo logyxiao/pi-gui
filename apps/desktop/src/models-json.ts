@@ -50,13 +50,6 @@ export interface ModelsJsonSaveResult {
   readonly enabledCount: number;
 }
 
-export interface CcSwitchSyncResult extends ModelsJsonSaveResult {
-  readonly sourcePath: string;
-  readonly importedProviderCount: number;
-  readonly importedModelCount: number;
-  readonly syncedPatternCount: number;
-}
-
 export interface ProviderProbeResult {
   readonly status: "ok" | "error";
   readonly modelCount: number;

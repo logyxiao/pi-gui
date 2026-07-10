@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type CSSProperties, type DragEvent, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type SetStateAction } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type CSSProperties, type DragEvent, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type SetStateAction } from "react";
 import type { SessionTreeSnapshot } from "@pi-gui/session-driver/types";
 import type { RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
 import {
@@ -13,7 +13,7 @@ import {
   type WorktreeRecord,
   type WorkspaceRecord,
 } from "./desktop-state";
-import { DiffPanel, type DiffPanelFileRequest } from "./diff-panel";
+import type { DiffPanelFileRequest } from "./diff-panel";
 import { buildModelOptions } from "./composer-commands";
 import { parseTreeComposerCommand } from "./composer-commands";
 import {
@@ -24,13 +24,11 @@ import { deriveModelOnboardingState } from "./model-onboarding";
 import { SkillsView } from "./skills-view";
 import { ExtensionsView } from "./extensions-view";
 import { type SettingsSection } from "./settings-view";
-import { SettingsSurface } from "./settings-surface";
 import { NewThreadView } from "./new-thread-view";
 import { buildThreadGroups } from "./thread-groups";
 import { Sidebar } from "./sidebar";
 import { SidebarToggleButton } from "./sidebar-toggle-button";
 import { Topbar } from "./topbar";
-import { TerminalPanel } from "./terminal-panel";
 import { useSlashMenu } from "./hooks/use-slash-menu";
 import { useConfirmDialog } from "./hooks/use-confirm-dialog";
 import { useNotificationPermission } from "./hooks/use-notification-permission";
@@ -55,6 +53,10 @@ import {
   readComposerAttachmentsFromFiles,
 } from "./composer-attachments";
 import { useI18n, type LanguageCode } from "./i18n";
+
+const DiffPanel = lazy(() => import("./diff-panel").then(({ DiffPanel }) => ({ default: DiffPanel })));
+const SettingsSurface = lazy(() => import("./settings-surface").then(({ SettingsSurface }) => ({ default: SettingsSurface })));
+const TerminalPanel = lazy(() => import("./terminal-panel").then(({ TerminalPanel }) => ({ default: TerminalPanel })));
 
 function canTogglePrimarySidebar(view: AppView | undefined): boolean {
   return view === "threads" || view === "new-thread";
@@ -792,15 +794,17 @@ export default function App({
     ? ({ "--diff-panel-width": `${diffPanelWidth}px` } as CSSProperties)
     : undefined;
   const terminalPanel = isTerminalVisibleForSelectedThread && selectedWorkspace ? (
-    <TerminalPanel
-      workspace={selectedWorkspace}
-      sessionId={selectedSession?.id ?? ""}
-      height={terminalHeight}
-      isTakeover={isTerminalTakeoverForSelectedThread}
-      onHeightChange={handleTerminalHeightChange}
-      onToggleTakeover={toggleTerminalTakeover}
-      onHide={hideTerminal}
-    />
+    <Suspense fallback={null}>
+      <TerminalPanel
+        workspace={selectedWorkspace}
+        sessionId={selectedSession?.id ?? ""}
+        height={terminalHeight}
+        isTakeover={isTerminalTakeoverForSelectedThread}
+        onHeightChange={handleTerminalHeightChange}
+        onToggleTakeover={toggleTerminalTakeover}
+        onHide={hideTerminal}
+      />
+    </Suspense>
   ) : null;
 
   const handleSelectNewThreadWorkspace = (workspaceId: string) => {
@@ -1268,57 +1272,59 @@ export default function App({
 
   if (snapshot.activeView === "settings") {
     return (
-      <SettingsSurface
-        section={settingsSection}
-        settingsWorkspace={settingsWorkspace}
-        settingsRuntime={settingsRuntime}
-        settingsModelRuntime={settingsModelRuntime}
-        rootWorkspaceOptions={rootWorkspaceOptions}
-        settingsWorkspaceId={settingsWorkspaceId}
-        notificationPreferences={snapshot.notificationPreferences}
-        notificationPermissionStatus={notificationPermissionStatus}
-        notificationPermissionPending={notificationPermissionPending}
-        modelSettingsScopeMode={snapshot.modelSettingsScopeMode}
-        integratedTerminalShell={snapshot.integratedTerminalShell}
-        themeMode={themeMode}
-        language={language}
-        commandCompatibility={settingsExtensionCommandCompatibility}
-        navItems={settingsNav}
-        onBack={() => setActiveView("threads")}
-        onSelectSection={(section) => setSettingsSection(section)}
-        onSelectWorkspaceId={setSettingsWorkspaceId}
-        onLoginProvider={handleLoginProvider}
-        onLogoutProvider={handleLogoutProvider}
-        onSetProviderApiKey={handleSetProviderApiKey}
-        onRemoveProviderApiKey={handleRemoveProviderApiKey}
-        onSetModelSettingsScopeMode={handleSetModelSettingsScopeMode}
-        onSetDefaultModel={handleSetDefaultModel}
-        onSetThinkingLevel={handleSetThinkingLevel}
-        onSetNotificationPreferences={handleSetNotificationPreferences}
-        onSetIntegratedTerminalShell={handleSetIntegratedTerminalShell}
-        onRequestNotificationPermission={handleRequestNotificationPermission}
-        onOpenSystemNotificationSettings={handleOpenSystemNotificationSettings}
-        onSetThemeMode={handleSetThemeMode}
-        onSetLanguage={onSetLanguage}
-        onToggleSkillCommands={handleToggleSkillCommands}
-        onRefreshRuntime={() => {
-          if (!settingsWorkspace) {
-            return;
+      <Suspense fallback={null}>
+        <SettingsSurface
+          section={settingsSection}
+          settingsWorkspace={settingsWorkspace}
+          settingsRuntime={settingsRuntime}
+          settingsModelRuntime={settingsModelRuntime}
+          rootWorkspaceOptions={rootWorkspaceOptions}
+          settingsWorkspaceId={settingsWorkspaceId}
+          notificationPreferences={snapshot.notificationPreferences}
+          notificationPermissionStatus={notificationPermissionStatus}
+          notificationPermissionPending={notificationPermissionPending}
+          modelSettingsScopeMode={snapshot.modelSettingsScopeMode}
+          integratedTerminalShell={snapshot.integratedTerminalShell}
+          themeMode={themeMode}
+          language={language}
+          commandCompatibility={settingsExtensionCommandCompatibility}
+          navItems={settingsNav}
+          onBack={() => setActiveView("threads")}
+          onSelectSection={(section) => setSettingsSection(section)}
+          onSelectWorkspaceId={setSettingsWorkspaceId}
+          onLoginProvider={handleLoginProvider}
+          onLogoutProvider={handleLogoutProvider}
+          onSetProviderApiKey={handleSetProviderApiKey}
+          onRemoveProviderApiKey={handleRemoveProviderApiKey}
+          onSetModelSettingsScopeMode={handleSetModelSettingsScopeMode}
+          onSetDefaultModel={handleSetDefaultModel}
+          onSetThinkingLevel={handleSetThinkingLevel}
+          onSetNotificationPreferences={handleSetNotificationPreferences}
+          onSetIntegratedTerminalShell={handleSetIntegratedTerminalShell}
+          onRequestNotificationPermission={handleRequestNotificationPermission}
+          onOpenSystemNotificationSettings={handleOpenSystemNotificationSettings}
+          onSetThemeMode={handleSetThemeMode}
+          onSetLanguage={onSetLanguage}
+          onToggleSkillCommands={handleToggleSkillCommands}
+          onRefreshRuntime={() => {
+            if (!settingsWorkspace) {
+              return;
+            }
+            void updateSnapshot(api, setSnapshot, () => api.refreshRuntime(settingsWorkspace.id));
+          }}
+          onOpenSkillFolder={handleOpenSkillFolder}
+          onToggleSkill={handleToggleSkill}
+          onTrySkill={(skill) =>
+            handleTrySkill(
+              skill.filePath
+                ? `${skill.slashCommand} `
+                : "Create a new skill for this workspace and explain which files you will add.",
+            )
           }
-          void updateSnapshot(api, setSnapshot, () => api.refreshRuntime(settingsWorkspace.id));
-        }}
-        onOpenSkillFolder={handleOpenSkillFolder}
-        onToggleSkill={handleToggleSkill}
-        onTrySkill={(skill) =>
-          handleTrySkill(
-            skill.filePath
-              ? `${skill.slashCommand} `
-              : "Create a new skill for this workspace and explain which files you will add.",
-          )
-        }
-        onOpenExtensionFolder={handleOpenExtensionFolder}
-        onToggleExtension={handleToggleExtension}
-      />
+          onOpenExtensionFolder={handleOpenExtensionFolder}
+          onToggleExtension={handleToggleExtension}
+        />
+      </Suspense>
     );
   }
 
@@ -1565,14 +1571,16 @@ export default function App({
           </>
         )}
         {showDiffPanel && selectedWorkspace && selectedSession ? (
-          <DiffPanel
-            workspaceId={selectedWorkspace.id}
-            sessionId={selectedSession.id}
-            api={api}
-            sessionStatus={selectedSession.status}
-            fileRequest={diffFileRequest}
-            onResizePointerDown={handleDiffPanelResizePointerDown}
-          />
+          <Suspense fallback={null}>
+            <DiffPanel
+              workspaceId={selectedWorkspace.id}
+              sessionId={selectedSession.id}
+              api={api}
+              sessionStatus={selectedSession.status}
+              fileRequest={diffFileRequest}
+              onResizePointerDown={handleDiffPanelResizePointerDown}
+            />
+          </Suspense>
         ) : null}
       </main>
       </div>

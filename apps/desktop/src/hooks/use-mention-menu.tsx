@@ -37,7 +37,7 @@ export function useMentionMenu({
   workspaceId,
   api,
 }: UseMentionMenuParams): MentionMenuState {
-  const [allFiles, setAllFiles] = useState<readonly string[]>([]);
+  const [allFiles, setAllFiles] = useState<readonly { readonly path: string; readonly lower: string }[]>([]);
   const [loadedWorkspaceId, setLoadedWorkspaceId] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [suppressed, setSuppressed] = useState(false);
@@ -71,7 +71,7 @@ export function useMentionMenu({
       if (cancelled) {
         return;
       }
-      setAllFiles(files);
+      setAllFiles(files.map((path) => ({ path, lower: path.toLowerCase() })));
       setLoadedWorkspaceId(workspaceId);
     }).catch(() => {
       if (cancelled) {
@@ -91,9 +91,12 @@ export function useMentionMenu({
       return [];
     }
     const lowerQuery = mentionMatch.query.toLowerCase();
-    return allFiles
-      .filter((file) => file.toLowerCase().includes(lowerQuery))
-      .slice(0, 10);
+    const matches: string[] = [];
+    for (const file of allFiles) {
+      if (file.lower.includes(lowerQuery)) matches.push(file.path);
+      if (matches.length === 10) break;
+    }
+    return matches;
   }, [allFiles, mentionMatch]);
 
   const showMentionMenu = mentionOptions.length > 0;

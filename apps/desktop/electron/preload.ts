@@ -28,11 +28,12 @@ import type {
   DesktopAppState,
   NotificationPreferences,
   RemoveWorktreeInput,
+  SelectedTranscriptDelta,
   SelectedTranscriptRecord,
   StartThreadInput,
   WorkspaceSessionTarget,
 } from "../src/desktop-state";
-import type { CcSwitchSyncResult, ModelsJsonFile, ModelsJsonSaveResult, ProviderProbeResult } from "../src/models-json";
+import type { ModelsJsonFile, ModelsJsonSaveResult, ProviderProbeResult } from "../src/models-json";
 import type { ProjectOpenAppId } from "../src/project-open-apps";
 
 const devReloadMarkersEnabled = process.env.PI_APP_DEV_RELOAD_MARKERS === "1";
@@ -72,6 +73,8 @@ contextBridge.exposeInMainWorld("piApp", {
     ipcRenderer.invoke(desktopIpc.selectedTranscriptRequest) as Promise<SelectedTranscriptRecord | null>,
   onSelectedTranscriptChanged: (listener: (payload: SelectedTranscriptRecord | null) => void) =>
     subscribeIpc(desktopIpc.selectedTranscriptChanged, listener),
+  onSelectedTranscriptDelta: (listener: (payload: SelectedTranscriptDelta) => void) =>
+    subscribeIpc(desktopIpc.selectedTranscriptDelta, listener),
   onCommand: (listener: (command: PiDesktopCommand) => void) =>
     subscribeIpc(desktopIpc.appCommand, listener),
   onWorkspacePicked: (listener: (workspaceId: string) => void) =>
@@ -166,8 +169,6 @@ contextBridge.exposeInMainWorld("piApp", {
     ipcRenderer.invoke(desktopIpc.probeProvider, provider) as Promise<ProviderProbeResult>,
   syncEnabledModels: (modelsJson: ModelsJsonFile) =>
     ipcRenderer.invoke(desktopIpc.syncEnabledModels, modelsJson) as Promise<string[]>,
-  syncCcSwitchProviders: () =>
-    ipcRenderer.invoke(desktopIpc.syncCcSwitchProviders) as Promise<CcSwitchSyncResult>,
   ensureTerminalPanel: (workspaceId: string, terminalScopeId: string, size?: Partial<TerminalSize>) =>
     ipcRenderer.invoke(desktopIpc.terminalEnsurePanel, workspaceId, terminalScopeId, size) as Promise<TerminalPanelSnapshot>,
   createTerminalSession: (workspaceId: string, terminalScopeId: string, size?: Partial<TerminalSize>) =>
@@ -217,7 +218,7 @@ contextBridge.exposeInMainWorld("piApp", {
   steerQueuedComposerMessage: (messageId: string) =>
     ipcRenderer.invoke(desktopIpc.steerQueuedComposerMessage, messageId) as Promise<DesktopAppState>,
   updateComposerDraft: (composerDraft: string) =>
-    ipcRenderer.invoke(desktopIpc.updateComposerDraft, composerDraft) as Promise<DesktopAppState>,
+    ipcRenderer.invoke(desktopIpc.updateComposerDraft, composerDraft) as Promise<void>,
   submitComposer: (text: string, options?: { readonly deliverAs?: "steer" | "followUp" }) =>
     ipcRenderer.invoke(desktopIpc.submitComposer, text, options) as Promise<DesktopAppState>,
   getSessionTree: (target: WorkspaceSessionTarget) =>
@@ -231,8 +232,8 @@ contextBridge.exposeInMainWorld("piApp", {
     ipcRenderer.invoke(desktopIpc.listWorkspaceFiles, workspaceId) as Promise<string[]>,
   getChangedFiles: (workspaceId: string) =>
     ipcRenderer.invoke(desktopIpc.getChangedFiles, workspaceId) as Promise<{ path: string; status: "added" | "modified" | "deleted" | "untracked"; staged: boolean; unstaged: boolean; indexStatus: string; worktreeStatus: string }[]>,
-  getFileDiff: (workspaceId: string, filePath: string, staged?: boolean) =>
-    ipcRenderer.invoke(desktopIpc.getFileDiff, workspaceId, filePath, staged) as Promise<string>,
+  getFileDiff: (workspaceId: string, filePath: string, mode?: "unstaged" | "staged" | "untracked") =>
+    ipcRenderer.invoke(desktopIpc.getFileDiff, workspaceId, filePath, mode) as Promise<string>,
   stageFile: (workspaceId: string, filePath: string) =>
     ipcRenderer.invoke(desktopIpc.stageFile, workspaceId, filePath) as Promise<void>,
   unstageFile: (workspaceId: string, filePath: string) =>

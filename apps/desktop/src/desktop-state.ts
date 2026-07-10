@@ -76,6 +76,22 @@ export interface SelectedTranscriptRecord {
   readonly transcript: readonly TranscriptMessage[];
 }
 
+export type SelectedTranscriptDelta =
+  | {
+      readonly kind: "appendAssistantText";
+      readonly workspaceId: string;
+      readonly sessionId: string;
+      readonly messageId: string;
+      readonly createdAt: string;
+      readonly text: string;
+    }
+  | {
+      readonly kind: "upsertItem";
+      readonly workspaceId: string;
+      readonly sessionId: string;
+      readonly item: TranscriptMessage;
+    };
+
 export interface WorktreeRecord {
   readonly id: string;
   readonly rootWorkspaceId: string;

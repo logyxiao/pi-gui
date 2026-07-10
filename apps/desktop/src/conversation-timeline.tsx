@@ -71,6 +71,7 @@ function ConversationTimelineComponent({
   const measuredHeightsRef = useRef(new Map<string, number>());
   const rowOffsetsRef = useRef<readonly number[]>([]);
   const rowHeightsRef = useRef<readonly number[]>([]);
+  const activeNavFrameRef = useRef<number | null>(null);
   const pendingScrollTargetRef = useRef<{ readonly itemId: string; readonly index: number } | null>(null);
   const [measurementVersion, setMeasurementVersion] = useState(0);
   const [activeNavItemId, setActiveNavItemId] = useState<string | null>(null);
@@ -192,6 +193,11 @@ function ConversationTimelineComponent({
     window.requestAnimationFrame(retry);
   }, [completePendingScroll, timelinePaneRef, transcript]);
 
+  const estimatedRowOffsets = useMemo(
+    () => buildTranscriptOffsets(transcript, measuredHeightsRef.current),
+    [measurementVersion, transcript],
+  );
+
   const syncActiveNavItem = useCallback(() => {
     const pane = timelinePaneRef.current;
     if (!pane || timelineNavItems.length === 0) {
@@ -199,36 +205,28 @@ function ConversationTimelineComponent({
       return;
     }
 
-    const viewportAnchor = pane.scrollTop + pane.clientHeight * 0.32;
-    const offsets = rowOffsetsRef.current;
-    let closest: ConversationTimelineNavItem = timelineNavItems[0] ?? {
-      id: "",
-      itemId: "",
-      index: 0,
-      kind: "user",
-      label: "",
-      ordinal: 0,
-    };
-    let closestDistance = Number.POSITIVE_INFINITY;
+    const offsets = rowOffsetsRef.current.length === transcript.length ? rowOffsetsRef.current : estimatedRowOffsets;
+    const closest = findClosestNavItem(timelineNavItems, offsets, pane.scrollTop + pane.clientHeight * 0.32);
+    setActiveNavItemId((current) => (current === closest?.id ? current : closest?.id ?? null));
+  }, [estimatedRowOffsets, timelineNavItems, timelinePaneRef, transcript.length]);
 
-    for (const item of timelineNavItems) {
-      const row = pane.querySelector<HTMLElement>(`[data-transcript-item-id="${cssEscape(item.itemId)}"]`);
-      const rowTop = row
-        ? row.getBoundingClientRect().top - pane.getBoundingClientRect().top + pane.scrollTop
-        : offsets[item.index] ?? estimateTranscriptOffset(transcript, item.index, measuredHeightsRef.current);
-      const distance = Math.abs(rowTop - viewportAnchor);
-      if (distance < closestDistance) {
-        closest = item;
-        closestDistance = distance;
-      }
-    }
-
-    setActiveNavItemId((current) => (current === closest.id ? current : closest.id));
-  }, [timelineNavItems, timelinePaneRef, transcript]);
+  const scheduleActiveNavSync = useCallback(() => {
+    if (activeNavFrameRef.current !== null) return;
+    activeNavFrameRef.current = window.requestAnimationFrame(() => {
+      activeNavFrameRef.current = null;
+      syncActiveNavItem();
+    });
+  }, [syncActiveNavItem]);
 
   useEffect(() => {
-    syncActiveNavItem();
-  }, [measurementVersion, syncActiveNavItem, transcript]);
+    scheduleActiveNavSync();
+    return () => {
+      if (activeNavFrameRef.current !== null) {
+        window.cancelAnimationFrame(activeNavFrameRef.current);
+        activeNavFrameRef.current = null;
+      }
+    };
+  }, [measurementVersion, scheduleActiveNavSync, transcript]);
 
   const assignTimelinePaneRef = useCallback((node: HTMLDivElement | null) => {
     timelinePaneRef.current = node;
@@ -243,7 +241,7 @@ function ConversationTimelineComponent({
         ref={assignTimelinePaneRef}
         onScroll={() => {
           onTimelineScroll();
-          syncActiveNavItem();
+          scheduleActiveNavSync();
           completePendingScroll("auto");
         }}
       >
@@ -645,21 +643,47 @@ function compactPopoverText(value: string): string {
   return compact.length > 76 ? `${compact.slice(0, 73)}…` : compact;
 }
 
+function buildTranscriptOffsets(
+  transcript: readonly TranscriptMessage[],
+  measuredHeights: ReadonlyMap<string, number>,
+): readonly number[] {
+  const offsets: number[] = [];
+  let offset = 0;
+  for (const [index, item] of transcript.entries()) {
+    offsets[index] = offset;
+    offset += measuredHeights.get(item.id) ?? estimateTimelineItemHeight(item);
+    offset += ROW_GAP_PX;
+  }
+  return offsets;
+}
+
 function estimateTranscriptOffset(
   transcript: readonly TranscriptMessage[],
   index: number,
   measuredHeights: ReadonlyMap<string, number>,
 ): number {
-  let offset = 0;
-  for (let currentIndex = 0; currentIndex < index; currentIndex += 1) {
-    const item = transcript[currentIndex];
-    if (!item) {
-      continue;
-    }
-    offset += measuredHeights.get(item.id) ?? estimateTimelineItemHeight(item);
-    offset += ROW_GAP_PX;
+  return buildTranscriptOffsets(transcript, measuredHeights)[index] ?? 0;
+}
+
+function findClosestNavItem(
+  items: readonly ConversationTimelineNavItem[],
+  offsets: readonly number[],
+  targetOffset: number,
+): ConversationTimelineNavItem | undefined {
+  let low = 0;
+  let high = items.length;
+  while (low < high) {
+    const mid = Math.floor((low + high) / 2);
+    if ((offsets[items[mid]?.index ?? 0] ?? 0) < targetOffset) low = mid + 1;
+    else high = mid;
   }
-  return offset;
+  const before = items[Math.max(0, low - 1)];
+  const after = items[Math.min(items.length - 1, low)];
+  if (!before) return after;
+  if (!after) return before;
+  return Math.abs((offsets[before.index] ?? 0) - targetOffset) <= Math.abs((offsets[after.index] ?? 0) - targetOffset)
+    ? before
+    : after;
 }
 
 function cssEscape(value: string): string {

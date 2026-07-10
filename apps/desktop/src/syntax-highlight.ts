@@ -23,29 +23,6 @@ export type HighlightTokenChild = string | HighlightToken;
 
 export type HighlightLine = readonly HighlightTokenChild[];
 
-const EXTENSION_TO_LANGUAGE: Readonly<Record<string, string>> = {
-  ts: "typescript",
-  tsx: "typescript",
-  mts: "typescript",
-  cts: "typescript",
-  js: "javascript",
-  jsx: "javascript",
-  mjs: "javascript",
-  cjs: "javascript",
-  json: "json",
-  py: "python",
-  sh: "bash",
-  bash: "bash",
-  zsh: "bash",
-};
-
-export function extensionToLanguage(filePath: string): string | undefined {
-  const dotIndex = filePath.lastIndexOf(".");
-  if (dotIndex < 0) return undefined;
-  const ext = filePath.slice(dotIndex + 1).toLowerCase();
-  return EXTENSION_TO_LANGUAGE[ext];
-}
-
 const lineCache = new LRUCache<string, HighlightLine>({ max: 5000 });
 
 export function highlightLine(line: string, language: string): HighlightLine {

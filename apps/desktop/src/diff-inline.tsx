@@ -1,5 +1,6 @@
 import { useMemo, type ReactNode } from "react";
 import { MAX_HIGHLIGHTED_LINES, highlightLine, type HighlightLine } from "./syntax-highlight";
+export { extractDiffFromOutput } from "./diff-output";
 
 interface DiffLine {
   readonly type: "added" | "removed" | "context" | "header";
@@ -96,32 +97,4 @@ function parseDiff(diff: string): DiffLine[] {
   }
 
   return result;
-}
-
-export function extractDiffFromOutput(output: unknown): string | undefined {
-  if (typeof output === "string" && (output.includes("@@") || output.startsWith("diff "))) {
-    return output;
-  }
-  if (isObj(output)) {
-    if (typeof output.diff === "string") {
-      return output.diff;
-    }
-    if (isObj(output.details) && typeof output.details.diff === "string") {
-      return output.details.diff;
-    }
-    if (Array.isArray(output.content)) {
-      for (const part of output.content) {
-        if (isObj(part) && part.type === "text" && typeof part.text === "string") {
-          if (part.text.includes("@@") || part.text.startsWith("diff ")) {
-            return part.text;
-          }
-        }
-      }
-    }
-  }
-  return undefined;
-}
-
-function isObj(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }

@@ -546,7 +546,15 @@ export function useTimelineController({
 
 function buildTranscriptChangeMarker(sessionKey: string, transcript: SelectedTranscriptRecord["transcript"]): string {
   const lastItem = transcript.at(-1);
-  return `${sessionKey}:${transcript.length}:${lastItem ? JSON.stringify(lastItem) : ""}`;
+  if (!lastItem) return `${sessionKey}:0`;
+  const changingContent = lastItem.kind === "message"
+    ? lastItem.text.length
+    : lastItem.kind === "tool"
+      ? `${lastItem.status}:${typeof lastItem.output === "string" ? lastItem.output.length : lastItem.output ? 1 : 0}`
+      : lastItem.kind === "activity"
+        ? `${lastItem.label.length}:${lastItem.detail?.length ?? 0}`
+        : lastItem.label.length;
+  return `${sessionKey}:${transcript.length}:${lastItem.id}:${changingContent}`;
 }
 
 function isNearBottom(element: HTMLDivElement): boolean {

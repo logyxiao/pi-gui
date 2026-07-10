@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as
 import type { PiDesktopApi } from "./ipc";
 import { InlineDiff } from "./diff-inline";
 import { ChevronDownIcon, ChevronRightIcon, LoadingCircleIcon, MinusIcon, PlusIcon, RefreshIcon, SparkIcon, UndoIcon } from "./icons";
-import { extensionToLanguage } from "./syntax-highlight";
+import { extensionToLanguage } from "./syntax-language";
 import { useI18n } from "./i18n";
 
 interface ChangedFile {
@@ -131,8 +131,10 @@ export function DiffPanel({
       setDiffText("");
       return;
     }
-    void api.getFileDiff(workspaceId, selectedFile.path, selectedFile.group === "staged").then(setDiffText);
-  }, [api, workspaceId, selectedFile, refreshNonce]);
+    const file = files.find((entry) => entry.path === selectedFile.path);
+    const mode = selectedFile.group === "staged" ? "staged" : file?.status === "untracked" ? "untracked" : "unstaged";
+    void api.getFileDiff(workspaceId, selectedFile.path, mode).then(setDiffText);
+  }, [api, files, workspaceId, selectedFile, refreshNonce]);
 
   const fileListRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {

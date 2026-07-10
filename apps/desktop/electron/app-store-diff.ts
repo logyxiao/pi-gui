@@ -92,47 +92,15 @@ export function getChangedFiles(workspacePath: string): Promise<ChangedFileEntry
   });
 }
 
-export function getFileDiff(workspacePath: string, filePath: string, staged = false): Promise<string> {
+export function getFileDiff(
+  workspacePath: string,
+  filePath: string,
+  mode: "unstaged" | "staged" | "untracked" = "unstaged",
+): Promise<string> {
   validateFilePath(workspacePath, filePath);
-  if (staged) {
-    return runGitDiff(workspacePath, ["diff", "--cached", "--", filePath]);
-  }
-
-  return new Promise((resolve) => {
-    execFile(
-      "git",
-      ["diff", "--", filePath],
-      { cwd: workspacePath, maxBuffer: 5 * 1024 * 1024 },
-      (error, stdout) => {
-        if (error || !stdout.trim()) {
-          // Try staged diff
-          execFile(
-            "git",
-            ["diff", "--cached", "--", filePath],
-            { cwd: workspacePath, maxBuffer: 5 * 1024 * 1024 },
-            (error2, stdout2) => {
-              if (!error2 && stdout2.trim()) {
-                resolve(stdout2);
-                return;
-              }
-              // Untracked file — show content as all-additions diff
-              execFile(
-                "git",
-                ["diff", "--no-index", "--", "/dev/null", filePath],
-                { cwd: workspacePath, maxBuffer: 5 * 1024 * 1024 },
-                (_error3, stdout3) => {
-                  // git diff --no-index exits 1 when files differ, which is expected
-                  resolve(stdout3 || "");
-                },
-              );
-            },
-          );
-          return;
-        }
-        resolve(stdout);
-      },
-    );
-  });
+  if (mode === "staged") return runGitDiff(workspacePath, ["diff", "--cached", "--", filePath]);
+  if (mode === "untracked") return runGitDiff(workspacePath, ["diff", "--no-index", "--", "/dev/null", filePath]);
+  return runGitDiff(workspacePath, ["diff", "--", filePath]);
 }
 
 export function stageFile(workspacePath: string, filePath: string): Promise<void> {
@@ -312,7 +280,8 @@ function runGitDiff(workspacePath: string, args: readonly string[]): Promise<str
       [...args],
       { cwd: workspacePath, maxBuffer: 5 * 1024 * 1024 },
       (error, stdout) => {
-        resolve(error ? "" : stdout);
+        // `git diff --no-index` exits 1 when files differ, but stdout is the desired diff.
+        resolve(error && !stdout ? "" : stdout);
       },
     );
   });
